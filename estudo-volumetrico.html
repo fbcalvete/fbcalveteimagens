@@ -2203,33 +2203,43 @@ function svgSituacao(s){
   for(let i=0;i<anel.length-1;i++){ const a=anel[i],b=anel[i+1],len=Math.hypot(b[0]-a[0],b[1]-a[1]);
     const rc=recDe(i,a,b); if(!(rc.r>0.05)) continue;
     if(rc.front){ if(len>lFr){lFr=len;iFr=i;} } else if(len>lDv){lDv=len;iDv=i;} }
-  /* linhas de recuo: um UNICO contorno (o mesmo recorte por meio-planos do
-     calculo do envelope, T.arestas ja e uma ordenacao CCW consistente),
-     nao um segmento independente por aresta do terreno. Antes cada aresta
-     desenhava sua propria linha, sem juntar nos cantos ("linhas soltas");
-     agora o tracejado acompanha a conformacao real do terreno, com os
-     vertices dos cantos compartilhados entre segmentos vizinhos. */
-  const recuosDef = arr.map(e=>({a:e.a, b:e.b, r: e.tipo==='frente'?s.rjEfetivo:(s.best.rDiv||0), front:e.tipo==='frente'}));
-  const recPoly = recortar(anel, recuosDef);
-  if(recPoly.anel && recPoly.anel.length>2){
-    for(let i=0;i<recPoly.anel.length-1;i++){
-      const a=recPoly.anel[i], b=recPoly.anel[i+1], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
-      if(len<0.15) continue;
-      const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
-      /* classifica o segmento pela reta de recuo original mais proxima
-         (mesma formula de offset usada dentro de recortar()) para colorir
-         jardim x lateral */
-      let front=false, melhorD=1e9;
-      for(const rd of recuosDef){
-        if(!(rd.r>0.05)) continue;
-        const ex=rd.b[0]-rd.a[0], ey=rd.b[1]-rd.a[1], el=Math.hypot(ex,ey)||1;
-        const onx=-ey/el, ony=ex/el;
-        const off=[rd.a[0]+onx*rd.r, rd.a[1]+ony*rd.r];
-        const d=Math.abs((mid[0]-off[0])*(ey/el) - (mid[1]-off[1])*(ex/el));
-        if(d<melhorD){ melhorD=d; front=rd.front; }
-      }
-      g+='<line x1="'+X(a[0]).toFixed(1)+'" y1="'+Y(a[1]).toFixed(1)+'" x2="'+X(b[0]).toFixed(1)+'" y2="'+Y(b[1]).toFixed(1)+'" stroke="'+(front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
-    }
+  /* linhas de recuo: offset LOCAL por vertice (miter join com as duas arestas
+     vizinhas), nao um recorte global por meio-planos. O recorte global
+     (recortar(), usado no calculo do envelope) pode COLAPSAR em lotes muito
+     irregulares — a mesma razao pela qual a torre implantada existe — e
+     nesse caso nao desenhava tracejado NENHUM (bug real: sumia a linha
+     inteira num lote em Z estreito). O offset local nunca some: cada canto
+     do contorno so depende das duas arestas vizinhas a ele, nao do lote
+     inteiro; em reentrancias apertadas cai para uma quina "chanfrada"
+     (bevel) em vez de um vertice de recorte disparado para longe. */
+  const nv = anel.length-1;
+  const recArr = [];
+  for(let i=0;i<nv;i++){ const a=anel[i], b=anel[i+1]; recArr.push(recDe(i,a,b)); }
+  const linhaDe = i => {
+    const a=anel[i], b=anel[i+1], ex=b[0]-a[0], ey=b[1]-a[1], el=Math.hypot(ex,ey)||1;
+    return {d:[ex/el, ey/el], nx:-ey/el, ny:ex/el};
+  };
+  const interReta=(p1,d1,p2,d2)=>{
+    const den = d1[0]*d2[1] - d1[1]*d2[0];
+    if(Math.abs(den)<1e-9) return null;
+    const t = ((p2[0]-p1[0])*d2[1] - (p2[1]-p1[1])*d2[0])/den;
+    return [p1[0]+d1[0]*t, p1[1]+d1[1]*t];
+  };
+  const offAnel = [];
+  for(let i=0;i<nv;i++){
+    const iPrev=(i-1+nv)%nv, vtx=anel[i];
+    const Lp=linhaDe(iPrev), Ln=linhaDe(i);
+    const pPrev=[vtx[0]+Lp.nx*recArr[iPrev].r, vtx[1]+Lp.ny*recArr[iPrev].r];
+    const pNext=[vtx[0]+Ln.nx*recArr[i].r, vtx[1]+Ln.ny*recArr[i].r];
+    const miter = interReta(pPrev, Lp.d, pNext, Ln.d);
+    const limite = Math.max(4*Math.max(recArr[iPrev].r, recArr[i].r), 8);
+    offAnel.push(miter && Math.hypot(miter[0]-vtx[0], miter[1]-vtx[1])<=limite ? miter : [(pPrev[0]+pNext[0])/2, (pPrev[1]+pNext[1])/2]);
+  }
+  for(let i=0;i<nv;i++){
+    if(!(recArr[i].r>0.05)) continue;
+    const a=offAnel[i], b=offAnel[(i+1)%nv], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+    if(len<0.15) continue;
+    g+='<line x1="'+X(a[0]).toFixed(1)+'" y1="'+Y(a[1]).toFixed(1)+'" x2="'+X(b[0]).toFixed(1)+'" y2="'+Y(b[1]).toFixed(1)+'" stroke="'+(recArr[i].front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
   }
   /* medidas de cada face do terreno (prioridade na colisao) */
   for(let i=0;i<anel.length-1;i++){

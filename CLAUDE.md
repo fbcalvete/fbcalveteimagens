@@ -165,14 +165,22 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
    valor cotado uma vez por tipo (maior frente e maior divisa) para não poluir em
    lotes de muitos vértices. Anti-sobreposição dos rótulos por AABB; medidas das
    faces têm prioridade.
-   **O tracejado é UM contorno só** (`recortar(anel, recuos)`, o mesmo recorte por
-   meio-planos usado no cálculo do envelope — não desenha mais um segmento
-   independente por aresta do terreno). Antes cada aresta original desenhava sua
-   própria linha offset, sem juntar nos cantos ("linhas soltas" — bug real
-   reportado pelo usuário); agora os vértices dos cantos são compartilhados entre
-   segmentos vizinhos, então o tracejado acompanha a conformação real do terreno.
-   A cor de cada segmento é decidida por distância perpendicular à reta de recuo
-   original mais próxima (mesma fórmula de offset do `recortar`).
+   **O tracejado é um contorno único por OFFSET LOCAL a cada vértice** (miter
+   join com as duas arestas vizinhas — não o recorte global por meio-planos do
+   `recortar()`, que é usado no cálculo do envelope mas **colapsa a zero
+   vértices em lotes bem irregulares** — a mesma razão pela qual a torre
+   implantada existe. Duas rodadas de bug real aqui: (1) antes cada aresta
+   original desenhava sua própria linha offset sem juntar nos cantos ("linhas
+   soltas"); (2) a primeira correção trocou para `recortar()` global, que
+   junta os cantos mas em lotes com "pescoço" estreito colapsa e não desenha
+   tracejado NENHUM — só apareceu com um lote em Z real do usuário. A versão
+   atual calcula, para cada vértice do terreno, a interseção das retas
+   offset das DUAS arestas vizinhas (miter); se a interseção dispara longe
+   demais (reentrância apertada), cai para uma quina chanfrada (bevel) em vez
+   do vértice de recorte. Como cada canto só depende das arestas vizinhas a
+   ele, nunca colapsa globalmente — sempre desenha algo, em qualquer lote.
+   A cor de cada segmento vem direto do tipo da aresta original que o gerou
+   (sem precisar comparar distâncias).
 2. **Corte esquemático** — altura atingida (cota), embasamento (base isenta),
    torre recuada acima (recuo lateral cotado), subsolos, e resumo textual.
 

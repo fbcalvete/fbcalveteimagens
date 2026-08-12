@@ -148,6 +148,36 @@ desenhado, e todo vértice respeita `rj`/recuo lateral. **Falta a validação
 visual num navegador real com o mapa e o ArcGIS ao vivo** — pendência do lado
 do usuário ou de uma sessão sem essa restrição de proxy.
 
+## 9. Recorte global colapsava o tracejado de recuo em lote em Z estreito
+Assim que o usuário testou a correção do item 8 num lote real (torre implantada,
+formato em Z com um "pescoço" estreito), a planta de situação veio **sem
+tracejado nenhum** — nem jardim, nem lateral. A correção do item 8 tinha trocado
+o desenho por segmento independente por `recortar(anel, recuos)`, o mesmo
+recorte por meio-planos sequencial usado para calcular o envelope da torre.
+**Causa:** `recortar()` intersecta TODOS os meio-planos ao mesmo tempo — em
+lotes com muitos vértices e alguma reentrância/pescoço estreito, essa
+interseção pode ficar vazia mesmo quando, olhando aresta por aresta, uma faixa
+de recuo válida existiria localmente. É exatamente a mesma razão pela qual a
+torre implantada existe (ver item 5): o recorte por semiplanos sliverriza em
+contornos irregulares. Confirmado sintéticamente: um Z com pescoço de ~4 m
+faz `recortar()` devolver 0 vértices para os mesmos recuos que o lote real
+tinha (rj=4, recuo lateral=8,2).
+
+**Correção:** o tracejado passou a ser um **offset local por vértice** (miter
+join): para cada vértice do terreno, calcula a interseção das retas-offset das
+DUAS arestas vizinhas (cada uma deslocada pela sua própria distância de
+recuo); se a interseção disparar longe demais (reentrância muito apertada),
+cai para uma quina chanfrada (ponto médio dos dois offsets) em vez do vértice
+de miter. Como cada canto só depende das duas arestas vizinhas a ele — nunca
+do lote inteiro — o contorno NUNCA colapsa; sempre desenha alguma coisa, e a
+cor de cada segmento vem direto do tipo da aresta original (sem precisar
+comparar distância a retas candidatas, o que também simplificou o código).
+Testado com o mesmo lote em Z sintético: `recortar()` global colapsa a 0
+vértices; o offset local produz os 9 segmentos esperados, com distância
+batendo com `rj`/recuo lateral em todos exceto o segmento do pescoço (onde o
+bevel assume, com uma pequena folga a mais — esperado e aceitável para uma
+linha de referência visual).
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
