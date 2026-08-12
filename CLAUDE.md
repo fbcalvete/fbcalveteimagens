@@ -124,24 +124,61 @@ ancorada na **maior testada** do lote.
   colava a laje em cima da outra).
 - **Formato**: começa quadrada no alvo, encostada no recuo de jardim. Se o recuo
   lateral não deixa fechar o alvo num retângulo, encolhe (mantendo quadrado/
-  proporção) até caber. Se ainda faltar área para o alvo, **deforma**: busca radial
-  (64 raios, busca binária) a partir do centro do melhor retângulo, seguindo o
-  contorno legal real (não o recorte por semiplanos, que sliverriza em contornos
-  ruidosos) — se sobrar área além do alvo, escala de volta para o alvo exato.
+  proporção) até caber. Se ainda faltar área para o alvo, **deforma**.
+  Botão **`#tgRetangular`** (barra de cima da massa 3D, "Laje retangular") força
+  a laje a ficar sempre no maior retângulo que couber, nunca deformando — passa
+  `soRetangular=true` para `torreImplantada()`, que pula a deformação inteira.
+- **Deformação — cuidado, já teve dois bugs reais de recuo sendo violado**:
+  1. Busca radial pura (raio legal por ângulo via busca binária a partir do
+     centro do retângulo) só garante que os **vértices** respeitam o recuo — a
+     **corda reta** entre dois raios vizinhos pode cortar por dentro da zona
+     proibida perto de uma reentrância do contorno, mesmo com as duas pontas
+     legais. Corrigido verificando o segmento inteiro por amostragem
+     (`segmentoSeguro`) e subdividindo o ângulo (não aceitando a corda) onde não
+     for seguro — refino adaptativo, só onde precisa.
+  2. A própria busca binária por raio assume legalidade **monotônica** ao
+     longo do raio (uma vez ilegal, nunca mais legal) — falso perto de uma
+     reentrância (o raio pode sair da faixa de recuo de uma divisa e reentrar
+     na de outra mais adiante). Corrigido trocando por varredura em passos até
+     achar a **primeira** falha (garantidamente a mais próxima do centro), só
+     então refinando esse último trecho com busca binária.
+  Ambos os bugs só apareceram testando um lote em L sintético com reentrância
+  perto de onde a torre é centralizada — os lotes "simples" (retângulo, esquina,
+  faixa estreita) sempre passaram. **Se mexer nisso de novo, sempre valide por
+  ARESTA (amostrando pontos ao longo de cada segmento do polígono resultante),
+  nunca só pelos vértices** — um polígono pode ter todo vértice legal e ainda
+  assim violar o recuo no meio de uma aresta.
+- Perto de uma reentrância bem apertada o raio legal por ângulo pode ter um
+  "degrau" quase vertical (uma esquina real do contorno) onde a subdivisão
+  adaptativa não converge — bate no limite de profundidade e sobra muita gente
+  vértice (chegou a >1000 num teste sintético). Simplificação por remoção seguro
+  (`segmentoSeguro` de novo) com limiar de **área do triângulo** (não só
+  "seguro", que sozinho colapsa a laje pra um núcleo bem menor que o legal —
+  outro bug real: a área após "simplificar" caía abaixo da própria área do
+  retângulo original) escala o limiar aos poucos até caber num número razoável
+  de vértices; se mesmo assim sobrar complexidade demais (~140+ vértices), a
+  rede de segurança final é **manter o retângulo simples** em vez de entregar
+  um polígono impraticável — sempre seguro, mesmo no pior caso.
   A área de `ti.area` é sempre `Math.abs(areaAnel(ti.anel))` — casa 100% com o
   polígono desenhado.
 - Sobe até a maior altura em que a laje (do tamanho que couber) ainda cabe
   respeitando o recuo no topo — **reduzir o alvo de área ganha altura**; aumentar
   exige altura menor (mesmo mecanismo, agora exposto ao usuário via `#ovLajeImplant`).
-- Testado com funções puras extraídas (sem browser) em 4 cenários sintéticos:
-  testada única sem esquina, lote de esquina, lote estreito forçando deformação, e
-  o mesmo lote de esquina com alvo menor (confirma o trade-off área↔altura). Os 4
-  passam com área reportada == área do polígono e distâncias de recuo respeitadas.
+- Testado com funções puras extraídas (sem browser) em 6 cenários sintéticos:
+  testada única sem esquina, lote de esquina, lote estreito forçando deformação,
+  o mesmo lote de esquina com alvo menor (trade-off área↔altura), um lote em L
+  com reentrância (o cenário que pegou os dois bugs acima), e o mesmo lote em L
+  com `soRetangular=true`. Os 6 passam validando **arestas inteiras** (não só
+  vértices) contra o recuo, com área reportada == área shoelace do polígono.
 
 ## 3D (Three.js r128, `desenhar(s)`)
 
 Extruda o polígono real do lote: base (nBasePav pavimentos até a divisa) + torre
 (best.nT pavimentos a partir de best.anel) + wireframe do envelope máximo.
+
+Barra de cima: `#tbMassa`/`#btnPlantas` (troca de visão), `#tgRetangular`
+("Laje retangular" — força a torre implantada a não deformar, ver seção acima),
+`#tgEnv` (mostra/esconde o wireframe do envelope máximo).
 
 Rótulos de chão (ruas, cotas do terreno, recuo lateral): são **planos deitados**
 (`rotuloChao`), não sprites — não giram com a câmera e se alinham à rua/aresta.
@@ -165,22 +202,30 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
    valor cotado uma vez por tipo (maior frente e maior divisa) para não poluir em
    lotes de muitos vértices. Anti-sobreposição dos rótulos por AABB; medidas das
    faces têm prioridade.
-   **O tracejado é um contorno único por OFFSET LOCAL a cada vértice** (miter
-   join com as duas arestas vizinhas — não o recorte global por meio-planos do
-   `recortar()`, que é usado no cálculo do envelope mas **colapsa a zero
-   vértices em lotes bem irregulares** — a mesma razão pela qual a torre
-   implantada existe. Duas rodadas de bug real aqui: (1) antes cada aresta
-   original desenhava sua própria linha offset sem juntar nos cantos ("linhas
-   soltas"); (2) a primeira correção trocou para `recortar()` global, que
-   junta os cantos mas em lotes com "pescoço" estreito colapsa e não desenha
-   tracejado NENHUM — só apareceu com um lote em Z real do usuário. A versão
-   atual calcula, para cada vértice do terreno, a interseção das retas
-   offset das DUAS arestas vizinhas (miter); se a interseção dispara longe
-   demais (reentrância apertada), cai para uma quina chanfrada (bevel) em vez
-   do vértice de recorte. Como cada canto só depende das arestas vizinhas a
-   ele, nunca colapsa globalmente — sempre desenha algo, em qualquer lote.
-   A cor de cada segmento vem direto do tipo da aresta original que o gerou
-   (sem precisar comparar distâncias).
+   **O tracejado tenta primeiro `recortar()`** (o mesmo recorte por
+   meio-planos usado no cálculo do envelope) — é o método CORRETO, bate
+   exatamente com a laje desenhada quando não colapsa. Só cai para um
+   **offset local por vértice** (miter join com as duas arestas vizinhas, com
+   quina chanfrada/bevel se o miter disparar longe demais) quando `recortar()`
+   colapsa a zero vértices — lotes bem irregulares, a mesma razão pela qual a
+   torre implantada existe.
+   **Três rodadas de bug real aqui, cuidado se mexer de novo:**
+   1. Cada aresta original desenhava sua própria linha offset independente,
+      sem juntar nos cantos ("linhas soltas").
+   2. Trocou para `recortar()` global sempre — junta os cantos, mas em lotes
+      com "pescoço" estreito colapsa e não desenha tracejado NENHUM (só
+      apareceu com um lote em Z real do usuário).
+   3. Trocou para offset local sempre — funciona (nunca colapsa), mas o
+      miter pode disparar um "bico" quando o recuo é grande e o lote é
+      pequeno (o limite do miter era só proporcional ao recuo, não à escala
+      do próprio lote — só apareceu com um lote losangular real, recuo
+      lateral de 15,8 m num lote de ~30 m).
+   **Versão atual = híbrida**: `recortar()` primeiro (correto, e cobre a
+   maioria dos lotes — inclusive o losangular do bug 3, resolvendo-o de graça
+   por não precisar mais do offset local ali); offset local só como fallback,
+   com o limite do miter preso tanto ao recuo quanto a `diagonal do lote × 0,5`
+   (nunca mais que a metade da diagonal do próprio lote, resolve o bug 3
+   quando o fallback É usado).
 2. **Corte esquemático** — altura atingida (cota), embasamento (base isenta),
    torre recuada acima (recuo lateral cotado), subsolos, e resumo textual.
 
@@ -201,9 +246,19 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
   maior testada, centralizada nela ou no vértice se fizer esquina, encostada no
   recuo de jardim (de ambas as frentes na esquina), e deforma (busca radial) em
   vez de só encolher quando o alvo não fecha num retângulo.
+- Concluído (2ª rodada, depois que o usuário testou a 1ª num navegador real):
+  a laje deformada da torre implantada podia cortar por dentro do recuo perto
+  de reentrâncias (dois bugs na busca radial, ver seção "Torre implantada" —
+  corrigido com verificação por ARESTA inteira, não só vértice, mais rede de
+  segurança que volta pro retângulo se a forma ficar complexa demais); o
+  tracejado de recuo tinha voltado a quebrar (virava um "bico" gigante) num
+  lote losangular simples — virou híbrido, `recortar()` primeiro (correto) e
+  offset local só de fallback, com limite de miter preso à escala do lote;
+  novo botão `#tgRetangular` ("Laje retangular") força a torre implantada a
+  nunca deformar, sempre o maior retângulo que couber.
 - Em aberto (do lado do usuário): conferência pontual de ~17,5% de divergência de
   ZOT contra uma camada externa; conferência do visual final sobre o basemap CARTO
-  ao vivo; **validação em navegador real** da rodada de correções acima (só foi
+  ao vivo; **validação em navegador real** da 2ª rodada de correções (só foi
   possível testar a geometria pura nesta sessão — ver limitação de ambiente na
   seção de Testes).
 - Ideia futura: agrupar faces colineares numa medida só, para lotes de contorno

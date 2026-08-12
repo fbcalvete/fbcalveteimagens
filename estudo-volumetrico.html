@@ -337,6 +337,7 @@ table.q tr.em td{color:var(--paper)} table.q tr.em td:last-child{color:var(--bp)
       <button id="tbMassa" class="on">Massa 3D</button>
       <button id="btnPlantas">Ver Plantas</button>
       <span class="spacer"></span>
+      <button id="tgRetangular" title="Força a laje da torre implantada a ficar sempre num retângulo (o maior que couber respeitando os recuos), em vez de deformar para tentar chegar na área-alvo.">Laje retangular</button>
       <button id="tgEnv" class="on">Envelope máximo</button>
     </div>
     <div class="vpwrap">
@@ -615,7 +616,7 @@ function pontoNoPoligono(p, anel){
    contorno legal (busca radial a partir do retangulo encontrado) em vez de
    insistir num formato reto. Sobe ate a maior altura em que a laje (do
    tamanho que couber) ainda cabe respeitando o recuo no topo. */
-function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd){
+function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular){
   const anel = T.anel;
   const nv = anel.length-1;
   if(nv < 3) return null;
@@ -737,15 +738,126 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd){
   /* quando o retangulo nao fecha o alvo, deforma a laje: busca radial do
      maior contorno legal a partir do centro do melhor retangulo, depois
      escala de volta ao alvo se sobrar espaco — segue o desenho real dos
-     recuos em vez de insistir numa forma reta */
+     recuos em vez de insistir numa forma reta.
+     IMPORTANTE: busca radial pura so garante que os VERTICES da estrela
+     respeitam o recuo — perto de uma reentrancia do contorno (lote em L/Z),
+     a ARESTA RETA entre dois raios vizinhos pode cortar por dentro da zona
+     proibida mesmo com as duas pontas legais (a laje "passava do recuo" —
+     bug real, so apareceu com um lote em Z de verdade). Por isso, alem do
+     raio de cada angulo, verifica o SEGMENTO entre angulos vizinhos por
+     amostragem; onde nao for seguro, subdivide o angulo (busca binaria de
+     novo) em vez de aceitar a corda reta — refina so onde precisa. */
+  /* folga extra (alem da tolerancia de 0,05 m do proprio pontoOk) so para a
+     deformacao por busca radial: a busca por amostragem (raioLegal por
+     passos + segmentoSeguro por pontos discretos) tem uma resolucao finita,
+     entao sempre sobra um residuo entre o ultimo ponto amostrado seguro e o
+     ponto real do limite. Absorve esse residuo aqui em vez de deixar
+     escapar como violacao real (o ajuste por retangulo, que encosta
+     exatamente no recuo por design, NAO usa essa folga). */
+  const MARGEM_DEFORM = 0.12;
+  const raioLegal=(centroL, ang, rLat, raioMax)=>{
+    rLat += MARGEM_DEFORM;
+    if(!pontoOk(centroL, rLat)) return 0;
+    const ux=Math.cos(ang), uy=Math.sin(ang);
+    /* busca binaria pura assume legalidade MONOTONICA ao longo do raio (uma
+       vez ilegal, nunca mais legal) — perto de uma reentrancia do contorno
+       isso e falso (o raio pode sair da faixa de recuo de uma divisa e
+       reentrar na de outra mais adiante), e a busca binaria pode convergir
+       num raio bem maior que o realmente seguro (bug real: a laje deformada
+       cortava por dentro do recuo perto de uma dobra em L). Por isso varre
+       em passos ate achar a PRIMEIRA falha (garantidamente o raio legal mais
+       proximo do centro), so' entao refina esse ultimo trecho com busca
+       binaria (ali sim e monotonico, por construcao). */
+    const passos=100, passo=raioMax/passos;
+    let loBom=0, hiRuim=raioMax, achouRuim=false;
+    for(let s=1;s<=passos;s++){
+      const r=s*passo;
+      if(pontoOk([centroL[0]+ux*r, centroL[1]+uy*r], rLat)) loBom=r;
+      else { hiRuim=r; achouRuim=true; break; }
+    }
+    if(!achouRuim) return raioMax;
+    let lo=loBom, hi=hiRuim;
+    for(let it=0; it<20; it++){ const mid=(lo+hi)/2; if(pontoOk([centroL[0]+ux*mid, centroL[1]+uy*mid], rLat)) lo=mid; else hi=mid; }
+    return lo;
+  };
+  const segmentoSeguro=(p0,p1,rLat)=>{
+    rLat += MARGEM_DEFORM;
+    /* amostragem por PASSO FIXO (~0,4 m), nao por numero fixo de pontos —
+       um numero fixo de amostras basta pro segmento curto entre dois raios
+       vizinhos, mas na simplificacao (que junta varios segmentos numa corda
+       so, bem mais longa) um numero fixo de pontos deixa buracos entre as
+       amostras grandes o bastante pra esconder uma reentrancia inteira
+       (bug real: a simplificacao cortava a laje por dentro do recuo em vez
+       de so remover vertices redundantes). */
+    const comp = Math.hypot(p1[0]-p0[0], p1[1]-p0[1]);
+    const passos = Math.max(6, Math.ceil(comp/0.4));
+    for(let k=1;k<passos;k++){ const t=k/passos; if(!pontoOk([p0[0]+(p1[0]-p0[0])*t, p0[1]+(p1[1]-p0[1])*t], rLat)) return false; }
+    return true;
+  };
   const deformar=(centroL, rLat, raioMax)=>{
-    const N=64, pts=[];
-    for(let k=0;k<N;k++){
-      const ang=k/N*Math.PI*2, ux=Math.cos(ang), uy=Math.sin(ang);
-      if(!pontoOk(centroL, rLat)){ pts.push(centroL.slice()); continue; }
-      let lo=0, hi=raioMax;
-      for(let it=0; it<24; it++){ const mid=(lo+hi)/2; const p=[centroL[0]+ux*mid, centroL[1]+uy*mid]; if(pontoOk(p,rLat)) lo=mid; else hi=mid; }
-      pts.push([centroL[0]+ux*lo, centroL[1]+uy*lo]);
+    const N0=48, MAXPROF=10;
+    let angs=[]; for(let k=0;k<N0;k++) angs.push(k/N0*Math.PI*2);
+    let raios=angs.map(a=>raioLegal(centroL,a,rLat,raioMax));
+    const pontoDe=(a,r)=>[centroL[0]+Math.cos(a)*r, centroL[1]+Math.sin(a)*r];
+    for(let prof=0; prof<MAXPROF; prof++){
+      const novosAngs=[angs[0]], novosRaios=[raios[0]];
+      let mudou=false;
+      for(let i=0;i<angs.length;i++){
+        const j=(i+1)%angs.length;
+        const p0=pontoDe(angs[i],raios[i]), p1=pontoDe(angs[j],raios[j]);
+        if(!segmentoSeguro(p0,p1,rLat)){
+          const a1 = j===0 ? angs[j]+Math.PI*2 : angs[j];
+          const am=(angs[i]+a1)/2;
+          novosAngs.push(am); novosRaios.push(raioLegal(centroL,am,rLat,raioMax));
+          mudou=true;
+        }
+        if(j!==0){ novosAngs.push(angs[j]); novosRaios.push(raios[j]); }
+      }
+      angs=novosAngs; raios=novosRaios;
+      if(!mudou) break;
+    }
+    let pts=angs.map((a,i)=>pontoDe(a,raios[i]));
+    /* a subdivisao adaptativa concentra pontos perto de reentrancias e pode
+       chegar a centenas deles — pesado para desenhar (SVG e 3D) sem ganhar
+       precisao real. Simplifica removendo um vertice sempre que pular direto
+       pro vizinho seguinte AINDA e seguro (segmentoSeguro), preservando a
+       garantia de recuo — nao e um Douglas-Peucker por distancia, e por
+       LEGALIDADE: so remove o que comprovadamente nao muda o respeito ao
+       recuo. */
+    /* "seguro" nao e o mesmo que "sem perda de area": cortar a ponta de
+       QUALQUER vertice que sobressai (convexo) e sempre seguro (fica mais
+       conservador), entao um criterio so de seguranca colapsa a laje pra um
+       nucleo bem menor que o legal (bug real: a area apos simplificar caia
+       abaixo da propria area do retangulo original, jogando fora a area
+       ganha pela deformacao). Por isso tambem exige que a area do triangulo
+       (prev,cur,next) — o quanto aquele vertice contribui pro contorno —
+       seja pequena (imperceptivel); so remove pontos realmente redundantes
+       (quase colineares), preservando os que tracam a forma.
+       Perto de uma reentrancia bem apertada o raio legal pode ter um "degrau"
+       quase vertical entre dois angulos vizinhos (uma esquina real do
+       contorno) — nesse caso a subdivisao adaptativa nao converge (bate no
+       limite de profundidade) e sobra muito ponto que NAO e redundante a
+       0,3 m² (cada um carrega um pedacinho real do degrau). Em vez de travar
+       nisso, escala o limiar de area aos poucos ate caber num numero razoavel
+       de vertices — perde um pouco de precisao do degrau, mas fica
+       utilizavel (o retangulo simples e a rede de seguranca final, ver
+       abaixo, se mesmo assim sobrar complexidade demais). */
+    const simplificaAte=(limiarArea)=>{
+      for(let pass=0; pass<8; pass++){
+        let mudou=false, i=0;
+        while(pts.length>4 && i<pts.length){
+          const n=pts.length, prev=pts[(i-1+n)%n], cur=pts[i], next=pts[(i+1)%n];
+          const areaTri = Math.abs((cur[0]-prev[0])*(next[1]-prev[1]) - (cur[1]-prev[1])*(next[0]-prev[0]))/2;
+          if(areaTri<limiarArea && segmentoSeguro(prev,next,rLat) && pontoOk(prev,rLat) && pontoOk(next,rLat)){
+            pts.splice(i,1); mudou=true;
+          } else i++;
+        }
+        if(!mudou) break;
+      }
+    };
+    for(const limiar of [0.3, 1.5, 6, 24, 96]){
+      simplificaAte(limiar);
+      if(pts.length<=140) break;
     }
     pts.push(pts[0]);
     return pts;
@@ -763,11 +875,20 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd){
   if(!melhor) return null;
 
   let anelF=melhor.r.anel, areaF=melhor.r.area, Wf=melhor.r.W, Df=melhor.r.D;
-  if(areaF < alvo*0.98){
+  if(!soRetangular && areaF < alvo*0.98){
     const raioMax=Math.hypot(bb[2]-bb[0], bb[3]-bb[1]);
     const estrela = deformar([melhor.r.cx, melhor.r.cy], melhor.rLat, raioMax);
     let areaE = Math.abs(areaAnel(estrela));
-    if(areaE > areaF+1){
+    /* rede de seguranca: se mesmo depois de simplificar a laje deformada
+       ainda tiver vertices demais (contorno legal genuinamente cheio de
+       degraus, perto do limite de refino), nao vale a pena — fica pesada
+       pra desenhar e pouco legivel. Mantem o retangulo simples, que e
+       sempre seguro. */
+    if(areaE > areaF+1 && estrela.length <= 141){
+      /* encolhe em direcao ao centro se sobrou area alem do alvo — pontos
+         mais perto do centro sao no minimo tao seguros quanto os da estrela
+         original (o centro esta dentro da regiao legal e o raio de cada
+         angulo foi validado do centro pra fora). */
       if(areaE > alvo){
         const k=Math.sqrt(alvo/areaE);
         for(let i=0;i<estrela.length;i++) estrela[i]=[melhor.r.cx+(estrela[i][0]-melhor.r.cx)*k, melhor.r.cy+(estrela[i][1]-melhor.r.cy)*k];
@@ -1544,8 +1665,9 @@ function resolver(){
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
   const ovLajeVazio = !$('ovLajeImplant') || $('ovLajeImplant').value.trim() === '';
   const alvoLajeImplant = ovLajeVazio ? 600 : Math.max(30, num('ovLajeImplant'));
+  const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
   if(maxLajeNat < 80 && nMaxTorre >= 1){
-    const ti = torreImplantada(T, alvoLajeImplant, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd);
+    const ti = torreImplantada(T, alvoLajeImplant, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
       const nCA = acMax > acBase ? Math.floor((acMax-acBase)/ti.area) : 0;
@@ -2077,6 +2199,13 @@ $('tgEnv').onclick = function(){
   if(envG) envG.visible = mostrarEnv;
   this.classList.toggle('on', mostrarEnv);
 };
+/* forca a laje da torre implantada a ficar sempre retangular (maior que
+   couber respeitando os recuos), em vez de deformar para tentar chegar na
+   area-alvo — resolver() le esse estado via classList. */
+$('tgRetangular').onclick = function(){
+  this.classList.toggle('on');
+  calcular();
+};
 /* Popula a tabela editavel com os valores que a ZOT do lote define.
    Chamada quando a ZOT muda (selecao de lote, troca de zona, % combinada). */
 function preencherRegime(){
@@ -2203,43 +2332,73 @@ function svgSituacao(s){
   for(let i=0;i<anel.length-1;i++){ const a=anel[i],b=anel[i+1],len=Math.hypot(b[0]-a[0],b[1]-a[1]);
     const rc=recDe(i,a,b); if(!(rc.r>0.05)) continue;
     if(rc.front){ if(len>lFr){lFr=len;iFr=i;} } else if(len>lDv){lDv=len;iDv=i;} }
-  /* linhas de recuo: offset LOCAL por vertice (miter join com as duas arestas
-     vizinhas), nao um recorte global por meio-planos. O recorte global
-     (recortar(), usado no calculo do envelope) pode COLAPSAR em lotes muito
-     irregulares — a mesma razao pela qual a torre implantada existe — e
-     nesse caso nao desenhava tracejado NENHUM (bug real: sumia a linha
-     inteira num lote em Z estreito). O offset local nunca some: cada canto
-     do contorno so depende das duas arestas vizinhas a ele, nao do lote
-     inteiro; em reentrancias apertadas cai para uma quina "chanfrada"
-     (bevel) em vez de um vertice de recorte disparado para longe. */
-  const nv = anel.length-1;
-  const recArr = [];
-  for(let i=0;i<nv;i++){ const a=anel[i], b=anel[i+1]; recArr.push(recDe(i,a,b)); }
-  const linhaDe = i => {
-    const a=anel[i], b=anel[i+1], ex=b[0]-a[0], ey=b[1]-a[1], el=Math.hypot(ex,ey)||1;
-    return {d:[ex/el, ey/el], nx:-ey/el, ny:ex/el};
-  };
-  const interReta=(p1,d1,p2,d2)=>{
-    const den = d1[0]*d2[1] - d1[1]*d2[0];
-    if(Math.abs(den)<1e-9) return null;
-    const t = ((p2[0]-p1[0])*d2[1] - (p2[1]-p1[1])*d2[0])/den;
-    return [p1[0]+d1[0]*t, p1[1]+d1[1]*t];
-  };
-  const offAnel = [];
-  for(let i=0;i<nv;i++){
-    const iPrev=(i-1+nv)%nv, vtx=anel[i];
-    const Lp=linhaDe(iPrev), Ln=linhaDe(i);
-    const pPrev=[vtx[0]+Lp.nx*recArr[iPrev].r, vtx[1]+Lp.ny*recArr[iPrev].r];
-    const pNext=[vtx[0]+Ln.nx*recArr[i].r, vtx[1]+Ln.ny*recArr[i].r];
-    const miter = interReta(pPrev, Lp.d, pNext, Ln.d);
-    const limite = Math.max(4*Math.max(recArr[iPrev].r, recArr[i].r), 8);
-    offAnel.push(miter && Math.hypot(miter[0]-vtx[0], miter[1]-vtx[1])<=limite ? miter : [(pPrev[0]+pNext[0])/2, (pPrev[1]+pNext[1])/2]);
+  /* linhas de recuo: usa PRIMEIRO o mesmo recorte por meio-planos do calculo
+     do envelope (recortar()) — e o metodo CORRETO, e' literalmente como o
+     poligono da torre natural e calculado, entao o tracejado bate exatamente
+     com a laje nesses casos. So cai para um offset LOCAL por vertice (miter
+     join com as duas arestas vizinhas) quando recortar() colapsa — lotes
+     muito irregulares onde a intersecao de todos os meio-planos fica vazia,
+     a mesma razao pela qual a torre implantada existe (sem esse fallback o
+     tracejado sumia inteiro num lote em Z estreito — bug real). O offset
+     local e so uma aproximacao (pode formar um "bico" perto de reentrancias
+     apertadas ou recuos bem desiguais entre arestas vizinhas) — por isso so
+     e usado quando o metodo correto nao da resultado, e o limite do miter e
+     preso tanto a distancia de recuo quanto ao tamanho do proprio lote
+     (evita um bico gigante quando o recuo e grande mas o lote e pequeno —
+     bug real visto num lote losangular). */
+  const recuosDef = arr.map(e=>({a:e.a, b:e.b, r: e.tipo==='frente'?s.rjEfetivo:(s.best.rDiv||0), front:e.tipo==='frente'}));
+  const diagLote = Math.hypot(mxx-mnx, mxy-mny);
+  let segsRecuo = [];
+  const recPoly = recortar(anel, recuosDef);
+  if(recPoly.anel && recPoly.anel.length>2 && recPoly.area>0.5){
+    for(let i=0;i<recPoly.anel.length-1;i++){
+      const a=recPoly.anel[i], b=recPoly.anel[i+1], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(len<0.15) continue;
+      const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+      let front=false, melhorD=1e9;
+      for(const rd of recuosDef){
+        if(!(rd.r>0.05)) continue;
+        const ex=rd.b[0]-rd.a[0], ey=rd.b[1]-rd.a[1], el=Math.hypot(ex,ey)||1;
+        const onx=-ey/el, ony=ex/el;
+        const off=[rd.a[0]+onx*rd.r, rd.a[1]+ony*rd.r];
+        const d=Math.abs((mid[0]-off[0])*(ey/el) - (mid[1]-off[1])*(ex/el));
+        if(d<melhorD){ melhorD=d; front=rd.front; }
+      }
+      segsRecuo.push({a:a, b:b, front:front});
+    }
+  } else {
+    const nv = anel.length-1;
+    const recArr = [];
+    for(let i=0;i<nv;i++){ recArr.push(recDe(i,anel[i],anel[i+1])); }
+    const linhaDe = i => {
+      const a=anel[i], b=anel[i+1], ex=b[0]-a[0], ey=b[1]-a[1], el=Math.hypot(ex,ey)||1;
+      return {d:[ex/el, ey/el], nx:-ey/el, ny:ex/el};
+    };
+    const interReta=(p1,d1,p2,d2)=>{
+      const den = d1[0]*d2[1] - d1[1]*d2[0];
+      if(Math.abs(den)<1e-9) return null;
+      const t = ((p2[0]-p1[0])*d2[1] - (p2[1]-p1[1])*d2[0])/den;
+      return [p1[0]+d1[0]*t, p1[1]+d1[1]*t];
+    };
+    const offAnel = [];
+    for(let i=0;i<nv;i++){
+      const iPrev=(i-1+nv)%nv, vtx=anel[i];
+      const Lp=linhaDe(iPrev), Ln=linhaDe(i);
+      const pPrev=[vtx[0]+Lp.nx*recArr[iPrev].r, vtx[1]+Lp.ny*recArr[iPrev].r];
+      const pNext=[vtx[0]+Ln.nx*recArr[i].r, vtx[1]+Ln.ny*recArr[i].r];
+      const miter = interReta(pPrev, Lp.d, pNext, Ln.d);
+      const limite = Math.min(Math.max(4*Math.max(recArr[iPrev].r, recArr[i].r), 8), diagLote*0.5);
+      offAnel.push(miter && Math.hypot(miter[0]-vtx[0], miter[1]-vtx[1])<=limite ? miter : [(pPrev[0]+pNext[0])/2, (pPrev[1]+pNext[1])/2]);
+    }
+    for(let i=0;i<nv;i++){
+      if(!(recArr[i].r>0.05)) continue;
+      segsRecuo.push({a:offAnel[i], b:offAnel[(i+1)%nv], front:recArr[i].front});
+    }
   }
-  for(let i=0;i<nv;i++){
-    if(!(recArr[i].r>0.05)) continue;
-    const a=offAnel[i], b=offAnel[(i+1)%nv], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  for(const seg of segsRecuo){
+    const len=Math.hypot(seg.b[0]-seg.a[0], seg.b[1]-seg.a[1]);
     if(len<0.15) continue;
-    g+='<line x1="'+X(a[0]).toFixed(1)+'" y1="'+Y(a[1]).toFixed(1)+'" x2="'+X(b[0]).toFixed(1)+'" y2="'+Y(b[1]).toFixed(1)+'" stroke="'+(recArr[i].front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
+    g+='<line x1="'+X(seg.a[0]).toFixed(1)+'" y1="'+Y(seg.a[1]).toFixed(1)+'" x2="'+X(seg.b[0]).toFixed(1)+'" y2="'+Y(seg.b[1]).toFixed(1)+'" stroke="'+(seg.front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
   }
   /* medidas de cada face do terreno (prioridade na colisao) */
   for(let i=0;i<anel.length-1;i++){

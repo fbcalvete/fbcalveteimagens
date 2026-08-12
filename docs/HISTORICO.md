@@ -178,6 +178,68 @@ batendo com `rj`/recuo lateral em todos exceto o segmento do pescoço (onde o
 bevel assume, com uma pequena folga a mais — esperado e aceitável para uma
 linha de referência visual).
 
+## 10. Laje deformada cortando o recuo + tracejado quebrado de novo (lote real)
+O usuário testou as correções dos itens 8 e 9 em lotes reais e voltou com dois
+prints: um lote em Z com torre implantada onde a laje (deformada, 600 m²)
+visivelmente ultrapassava a linha de recuo lateral; e um lote losangular onde o
+tracejado de recuo tinha virado um "bico"/spike gigante em vez de acompanhar o
+terreno. Pediu também um botão para forçar a laje a ficar sempre retangular.
+
+**Laje deformada cortando o recuo — dois bugs empilhados na busca radial:**
+1. A busca radial (raio legal por ângulo, binária a partir do centro) só
+   validava os VÉRTICES da estrela resultante. A ARESTA reta entre dois raios
+   vizinhos podia cortar por dentro da zona proibida perto de uma reentrância
+   do contorno, mesmo com as duas pontas legais. Corrigido com refino
+   adaptativo: verifica o segmento inteiro por amostragem
+   (`segmentoSeguro`) e, onde não for seguro, subdivide o ângulo em vez de
+   aceitar a corda reta.
+2. Ao caçar esse bug com um lote sintético em L (reentrância de propósito), a
+   correção acima ainda falhava por ~5 m. Causa: a busca BINÁRIA por raio
+   assume legalidade monotônica ao longo do raio (uma vez ilegal, nunca mais
+   legal) — falso perto de uma reentrância, onde o raio pode sair da faixa de
+   recuo de uma divisa e reentrar na de outra mais além. A busca binária
+   convergia num raio bem maior que o seguro. Corrigido trocando por
+   varredura em passos até achar a PRIMEIRA falha (garantidamente a mais
+   próxima do centro), refinando só esse último trecho com busca binária
+   (aí sim monotônico, por construção).
+   Depois desses dois, o lote em L sintético passou a 0,18 m de violação —
+   ainda não zero, fechado com uma folga de segurança extra (12 cm) só na
+   busca de deformação (não na do retângulo, que encosta no recuo por design).
+
+**Efeito colateral: milhares de vértices perto da reentrância.** Corrigir a
+busca radial revelou que perto de uma reentrância bem apertada o raio legal
+por ângulo pode ter um "degrau" quase vertical (uma esquina real do contorno)
+onde a subdivisão adaptativa nunca converge — bate no limite de profundidade
+e sobra um polígono de mais de 1000 vértices. Tentativa de simplificação só
+por "é seguro remover" colapsou a laje pra uma área BEM menor que a do
+retângulo original (cortar a ponta de qualquer vértice saliente é sempre mais
+conservador, logo sempre "seguro" — um critério só de segurança devora a área
+inteira). Corrigido exigindo também que a área do triângulo (vizinho-anterior,
+vértice, vizinho-seguinte) seja pequena — só remove o que é redundante de
+verdade — com o limiar escalando aos poucos se não bastar; se mesmo assim
+sobrar complexidade (~140+ vértices), a rede de segurança final é manter o
+retângulo simples em vez de entregar uma malha impraticável.
+
+**Tracejado virando um bico num lote losangular.** A correção do item 9 trocou
+o tracejado para SEMPRE usar offset local por vértice (miter join), abandonando
+`recortar()`. Mas esse lote losangular tinha um recuo lateral grande (15,8 m)
+num lote pequeno (~30 m de lado) — o limite do miter só era proporcional ao
+próprio recuo (`4×r`), não à escala do lote, e deixava passar um miter de
+~60 m num lote de 30 m. **Corrigido virando híbrido**: tenta `recortar()`
+primeiro (o mesmo recorte por meio-planos do envelope — correto quando não
+colapsa, e cobre a maioria dos lotes, inclusive esse losangular, sem nem
+precisar do offset local); só cai pro offset local quando `recortar()`
+colapsa, e aí sim com o limite do miter preso também à diagonal do lote.
+
+**Novo botão "Laje retangular"** (`#tgRetangular`, barra de cima da massa 3D):
+força `torreImplantada()` a pular a deformação inteira e ficar sempre no maior
+retângulo que couber — `soRetangular=true`.
+
+**Teste**: 4 cenários antigos + 2 novos (lote em L com reentrância, e o mesmo
+lote com `soRetangular=true`) — 6 no total, agora validando a ARESTA INTEIRA de
+cada polígono resultante (amostrando vários pontos por segmento), não só os
+vértices, porque foi exatamente isso que escondeu o bug original.
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
@@ -201,8 +263,9 @@ linha de referência visual).
 - Conferência pontual (do seu lado) de ~17,5% de divergência de ZOT contra uma
   camada externa.
 - Conferência do visual final sobre o basemap CARTO ao vivo.
-- Validação em navegador real da rodada de correções do item 8 (recuo na planta,
-  laje física, torre implantada reancorada) — só testada com geometria pura nesta
-  sessão, por causa da restrição de proxy/Chromium acima.
+- Validação em navegador real da rodada de correções dos itens 8-10 (recuo na
+  planta, laje física, torre implantada reancorada, laje deformada sem cortar
+  o recuo, botão laje retangular) — só testada com geometria pura nesta sessão,
+  por causa da restrição de proxy/Chromium acima.
 - Melhoria futura: agrupar faces colineares numa medida só na planta de situação,
   para lotes de contorno muito ruidoso.
