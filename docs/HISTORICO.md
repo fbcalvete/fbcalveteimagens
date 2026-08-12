@@ -240,6 +240,56 @@ lote com `soRetangular=true`) — 6 no total, agora validando a ARESTA INTEIRA d
 cada polígono resultante (amostrando vários pontos por segmento), não só os
 vértices, porque foi exatamente isso que escondeu o bug original.
 
+## 11. Botão "Laje retangular" sem efeito + tracejado invisível num lote real
+O usuário testou num terreno triangular de verdade (582 m², ZOT 8.3-C) e viu
+dois problemas: o botão "Laje retangular" não parecia mudar nada, e nenhum
+tracejado de recuo aparecia na planta de situação — só as cotas/rótulos de
+texto ("recuo jardim 4,0 m", "recuo lateral 9,3 m"), sem a linha em si. Pediu
+para não parar até os dois estarem 100% corrigidos.
+
+**Botão sem efeito — causa raiz no GATILHO da torre implantada, não no botão.**
+`torreImplantada()` só é chamada quando `maxLajeNat < 80` — a MAIOR laje entre
+TODOS os pavimentos da torre natural. Mas o otimizador padrão maximiza altura
+primeiro: `best` (o que de fato é desenhado e mostrado) é o pavimento mais
+ALTO viável, não o de maior laje. Nesse lote triangular, um pavimento baixo
+tinha laje boa (empurrando `maxLajeNat` para cima de 80), mas o pavimento mais
+alto — o que o otimizador escolhe e o que aparecia na tela — tinha só 40 m²
+(a laje encolhe com a altura, porque o recuo cresce com H). Resultado: o
+gatilho nunca disparava, `torreImplantada()` nunca era chamada, e o botão
+"Laje retangular" não tinha nada para atuar — daí parecer quebrado.
+**Corrigido** trocando o gatilho para `maxLajeNat < 80 || best.laje < 80`:
+dispara também quando o pavimento ESCOLHIDO (não só o melhor possível) está
+com uma laje inutilizável. Verificado direto contra a condição no arquivo
+real (não só descrito): simulando as duas curvas (laje boa embaixo, fiapo no
+topo escolhido) confirma que o gatilho antigo ficava `false` e o novo `true`
+para esse caso, sem mudar o comportamento em lotes simples (laje sempre boa)
+nem no caso já coberto antes (fiapo em todos os pavimentos).
+
+**Tracejado invisível — torre natural que ocupa o envelope inteiro.** Numa
+torre NATURAL (sem torre implantada), `best.anel` é literalmente calculado
+pelo mesmo `recortar()` com os mesmos recuos que o tracejado usa — ou seja, a
+linha de recuo e o contorno da torre são o MESMO polígono. O tracejado é
+desenhado por cima (depois, na ordem do SVG), mas numa cor quase idêntica ao
+contorno sólido da torre (`#6fb2ff` do tracejado vs `#4da3ff` do contorno) —
+um traço fino tracejado em cima de um traço sólido quase da mesma cor fica
+imperceptível. **Corrigido** desenhando um halo de contraste (linha grossa na
+cor de fundo do painel, `#0e141b`) atrás de cada segmento antes do traço
+colorido — garante que o tracejado apareça em cima de qualquer coisa, mesmo
+exatamente coincidente com o contorno da torre.
+
+**Verificação**: como `resolver()` depende de dezenas de campos de formulário
+(DOM), não dá para chamá-lo direto fora do navegador. Em vez disso: (1) a
+condição do gatilho foi extraída do arquivo real e testada com dados
+sintéticos reproduzindo a curva do lote do usuário (laje boa embaixo, fiapo
+no topo) — confirma gatilho antigo=false, novo=true, sem regressão nos outros
+casos; (2) o bloco de geração do tracejado (o mesmo código de dentro de
+`svgSituacao`) foi extraído e executado com um lote triangular sintético
+onde `best.anel` é literalmente o mesmo polígono do envelope de recuo — sem
+o halo, coincide exatamente com o contorno da torre; com a correção, os 3
+segmentos esperados aparecem, cada um com uma linha de halo E uma linha
+colorida no SVG gerado. Segue pendente a confirmação visual num navegador de
+verdade (mesma limitação de proxy/Chromium das rodadas anteriores).
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
@@ -263,9 +313,10 @@ vértices, porque foi exatamente isso que escondeu o bug original.
 - Conferência pontual (do seu lado) de ~17,5% de divergência de ZOT contra uma
   camada externa.
 - Conferência do visual final sobre o basemap CARTO ao vivo.
-- Validação em navegador real da rodada de correções dos itens 8-10 (recuo na
+- Validação em navegador real da rodada de correções dos itens 8-11 (recuo na
   planta, laje física, torre implantada reancorada, laje deformada sem cortar
-  o recuo, botão laje retangular) — só testada com geometria pura nesta sessão,
+  o recuo, botão laje retangular, gatilho da implantada, halo de contraste no
+  tracejado) — só testada com geometria pura/blocos extraídos nesta sessão,
   por causa da restrição de proxy/Chromium acima.
 - Melhoria futura: agrupar faces colineares numa medida só na planta de situação,
   para lotes de contorno muito ruidoso.

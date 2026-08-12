@@ -1658,15 +1658,25 @@ function resolver(){
                     acTorre:0,acTotal:acBase,sat:false};
 
   /* Torre inviavel: os recuos erodiram o poligono irregular ate sobrar
-     laje ~0 em TODOS os pavimentos. Em vez de nao viabilizar, reparte o
-     lote com uma torre implantada compacta (~600 m2) recuada da maior
-     frente. Usa a MAIOR laje possivel da torre natural como criterio. */
+     laje ~0. Em vez de nao viabilizar, reparte o lote com uma torre
+     implantada compacta (~600 m2, editavel) recuada da maior frente.
+     GATILHO: nao basta olhar so a MAIOR laje possivel entre todos os
+     pavimentos (maxLajeNat) — o otimizador padrao maximiza altura primeiro
+     (best = o pavimento mais ALTO viavel, nao o de maior laje), e a laje
+     encolhe com a altura (recuo cresce com H). Um lote pode ter laje boa
+     (>=80) num pavimento baixo mas so um fiapo de laje no pavimento mais
+     alto escolhido — nesse caso maxLajeNat>=80 e o gatilho antigo nunca
+     disparava, mesmo com o resultado FINAL (best.laje) sendo um fiapo
+     inutilizavel (bug real: a torre implantada e o botao "laje retangular"
+     nao tinham efeito nenhum nesses lotes, porque nunca eram sequer
+     tentados). Dispara tambem quando o proprio best.laje (o que de fato
+     aparece na planta) e pequeno, nao so quando NENHUM pavimento presta. */
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
   const ovLajeVazio = !$('ovLajeImplant') || $('ovLajeImplant').value.trim() === '';
   const alvoLajeImplant = ovLajeVazio ? 600 : Math.max(30, num('ovLajeImplant'));
   const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
-  if(maxLajeNat < 80 && nMaxTorre >= 1){
+  if((maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
     const ti = torreImplantada(T, alvoLajeImplant, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
@@ -2398,7 +2408,16 @@ function svgSituacao(s){
   for(const seg of segsRecuo){
     const len=Math.hypot(seg.b[0]-seg.a[0], seg.b[1]-seg.a[1]);
     if(len<0.15) continue;
-    g+='<line x1="'+X(seg.a[0]).toFixed(1)+'" y1="'+Y(seg.a[1]).toFixed(1)+'" x2="'+X(seg.b[0]).toFixed(1)+'" y2="'+Y(seg.b[1]).toFixed(1)+'" stroke="'+(seg.front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
+    const x1=X(seg.a[0]).toFixed(1), y1=Y(seg.a[1]).toFixed(1), x2=X(seg.b[0]).toFixed(1), y2=Y(seg.b[1]).toFixed(1);
+    /* halo de contraste atras do tracejado: quando a torre natural ocupa o
+       envelope INTEIRO (sem torre implantada), essa linha de recuo cai
+       exatamente em cima do contorno solido azul da torre — um tracejado
+       azul fino sobre um contorno solido quase da mesma cor fica
+       praticamente invisivel (bug real: o usuario via a torre mas nenhum
+       tracejado). Um contorno escuro grosso atras garante contraste
+       independente do que estiver desenhado embaixo. */
+    g+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#0e141b" stroke-width="3.4" opacity=".9"/>';
+    g+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+(seg.front?'#f2a03d':'#6fb2ff')+'" stroke-width="1.3" stroke-dasharray="7 3 2 3"/>';
   }
   /* medidas de cada face do terreno (prioridade na colisao) */
   for(let i=0;i<anel.length-1;i++){

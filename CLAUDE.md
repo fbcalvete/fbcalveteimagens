@@ -114,7 +114,16 @@ em polígonos de muitos vértices), o programa **reparte o terreno**: insere uma
 laje compacta (alvo editável em `#ovLajeImplant`, 600 m² por padrão) sempre
 ancorada na **maior testada** do lote.
 
-- Gatilho: maior laje da torre natural < 80 m² **e** a implantada rende mais.
+- **Gatilho**: maior laje da torre natural < 80 m² **OU** a laje do pavimento
+  ESCOLHIDO (`best.laje`, o mais alto viável — o otimizador padrão maximiza
+  altura primeiro) < 80 m² — **e** a implantada rende mais. Cuidado: checar
+  só a maior laje entre TODOS os pavimentos (`maxLajeNat`) não basta — um
+  lote pode ter laje boa num pavimento baixo mas só um fiapo no pavimento
+  mais alto escolhido pelo otimizador (a laje encolhe com a altura, recuo
+  cresce com H). Nesse caso `maxLajeNat` ficava ≥80 e o gatilho antigo nunca
+  disparava, mesmo com o resultado final sendo um fiapo — bug real: a torre
+  implantada e o botão "Laje retangular" pareciam não fazer nada nesses
+  lotes, porque nunca eram nem tentados.
 - **Ancoragem**: centralizada na maior testada (`torreImplantada()` agrupa arestas
   `frente` contíguas no anel — com wraparound — e pega o grupo de maior soma de
   comprimento). Se essa testada faz esquina com outra frente (mudança de direção
@@ -226,6 +235,14 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
    com o limite do miter preso tanto ao recuo quanto a `diagonal do lote × 0,5`
    (nunca mais que a metade da diagonal do próprio lote, resolve o bug 3
    quando o fallback É usado).
+   **4º bug real**: numa torre NATURAL (sem torre implantada) que ocupa o
+   envelope inteiro, `best.anel` é literalmente o mesmo polígono que o
+   tracejado desenha — a linha tracejada cai EM CIMA do contorno sólido da
+   torre, numa cor quase igual (azul do tracejado `#6fb2ff` vs azul do
+   contorno da torre `#4da3ff`), ficando praticamente invisível. Corrigido
+   desenhando um halo de contraste (linha grossa `#0e141b`, cor do fundo)
+   atrás de cada segmento tracejado — garante contraste em cima de qualquer
+   coisa desenhada embaixo, incluindo a própria torre.
 2. **Corte esquemático** — altura atingida (cota), embasamento (base isenta),
    torre recuada acima (recuo lateral cotado), subsolos, e resumo textual.
 
@@ -256,6 +273,15 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
   offset local só de fallback, com limite de miter preso à escala do lote;
   novo botão `#tgRetangular` ("Laje retangular") força a torre implantada a
   nunca deformar, sempre o maior retângulo que couber.
+- Concluído (3ª rodada, dois bugs vistos pelo usuário num lote real): o
+  gatilho da torre implantada só olhava a MAIOR laje entre todos os
+  pavimentos, não a do pavimento efetivamente ESCOLHIDO — num lote onde a
+  laje encolhe bastante no pavimento mais alto, o gatilho nunca disparava e
+  o botão "Laje retangular" parecia não ter efeito (corrigido, ver seção
+  "Torre implantada"); e o tracejado ficava invisível numa torre NATURAL que
+  ocupa o envelope inteiro, por cair exatamente em cima do contorno sólido
+  da torre numa cor quase igual — corrigido com um halo de contraste atrás
+  do tracejado (ver seção "Plantas").
 - Em aberto (do lado do usuário): conferência pontual de ~17,5% de divergência de
   ZOT contra uma camada externa; conferência do visual final sobre o basemap CARTO
   ao vivo; **validação em navegador real** da 2ª rodada de correções (só foi
