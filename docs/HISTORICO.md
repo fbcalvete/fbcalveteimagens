@@ -83,6 +83,71 @@ lateral), na paleta do programa. Valor cotado uma vez por tipo (maior frente e
 maior divisa) para não poluir em lotes de muitos vértices. Medidas das faces têm
 prioridade na colisão.
 
+## 8. Correções na planta de situação e na torre implantada (primeira rodada no Claude Code)
+A partir de um print de uma planta real, três problemas foram reportados de uma vez:
+
+**Recuo lateral com "linhas soltas" na planta de situação.** O tracejado de
+recuo desenhava, para cada aresta ORIGINAL do terreno, sua própria linha
+deslocada para dentro — sem juntar com a linha da aresta vizinha. Em cantos
+(principalmente do lado da divisa, com várias arestas em sequência) isso
+deixava segmentos desconectados. **Correção:** passou a desenhar o contorno
+único que sai de `recortar(anel, recuos)` — a mesma função de recorte por
+meio-planos já usada para calcular o envelope da torre — em vez de segmentos
+independentes. Como é um único array de vértices ordenado, os cantos
+compartilham vértice automaticamente. A cor de cada segmento (âmbar/jardim ou
+azul/lateral) é decidida por distância perpendicular à reta de offset original
+mais próxima.
+
+**Área da laje divergente entre a planta e o texto.** A causa: `lajeReal` (usada
+em toda a UI, na planta e no corte) era calculada como `best.acTorre/best.nT` —
+uma MÉDIA da área computável ao longo dos pavimentos, que cai sempre que o CA
+satura antes do último pavimento ou a torre afunila com a altura (cada nível
+tem um envelope diferente, mais apertado no topo). Mas o polígono DESENHADO
+(`best.anel`) sempre foi a área do pavimento mais alto (`best.laje`), o mais
+restritivo — daí a divergência real vista no print (planta mostrando uma laje
+maior que o número escrito). **Correção:** `lajeReal = best.laje` sempre, que é
+por construção a área shoelace do próprio `best.anel` em todos os três casos
+(torre natural, implantada, ou só a base) — 100% consistente com o desenho.
+
+**Torre implantada: reposicionamento completo.** O algoritmo antigo buscava em
+grade (varria centros x alturas) a posição de maior score, sem garantia de ficar
+na testada principal nem de encostar no recuo de jardim. Reescrito para:
+- Agrupar as arestas `frente` contíguas do anel (com wraparound) e escolher o
+  grupo de maior comprimento total = a testada principal.
+- Detectar esquina (mudança de direção > 25° dentro do grupo) — se houver,
+  ancora no vértice da esquina; senão, no ponto médio do comprimento acumulado
+  da testada (não a corda reta, para testadas com leve curvatura).
+- Área-alvo virou parâmetro editável (`#ovLajeImplant`, default 600 m²) em vez
+  de constante fixa no código.
+- Retângulo sempre começa quadrado e encostado no recuo de jardim; encolhe
+  mantendo a proporção até respeitar o recuo lateral; se ainda faltar área para
+  o alvo, DEFORMA por busca radial (64 raios, busca binária por ponto) a partir
+  do centro do melhor retângulo, seguindo o contorno legal real — depois escala
+  de volta ao alvo se sobrar espaço.
+- **Bug pego só depois de testar com um lote de esquina sintético:** a primeira
+  versão do código de esquina centralizava a laje simetricamente sobre o vértice,
+  jogando metade dela para fora do lote. A correção seguinte respeitava o recuo
+  da frente de referência mas colava a laje em cima da OUTRA frente (a que faz
+  esquina) — porque só afastava `rj` na direção de profundidade, não na de
+  largura. Fórmula final desloca o centro por `rj + W/2` na largura E `rj + D/2`
+  na profundidade, a partir do vértice — a laje fica a `rj` de QUALQUER uma das
+  duas frentes da esquina.
+
+**Sobre o teste desta rodada:** o Puppeteer/Playwright headless não conseguiu
+completar handshake TLS com NENHUM host externo (nem CDN, nem o ArcGIS da
+prefeitura) neste ambiente — o `curl` com o mesmo proxy funcionava normalmente,
+então não é allowlist; o RESET acontecia a meio do TLS mesmo em hosts sem
+proxy. Sem conseguir abrir o app no navegador de verdade, a validação foi feita
+extraindo as funções de geometria puras (`torreImplantada`, `recortar`,
+`pontoNoPoligono`, `areaAnel`, `distPtSeg` — nenhuma delas toca DOM) para um
+módulo Node isolado e testando com lotes sintéticos (retângulo com testada
+única, lote de esquina, lote estreito forçando deformação, e o mesmo lote de
+esquina com alvo menor para confirmar o trade-off área↔altura). Os 4 cenários
+passaram: área reportada bate exatamente com a área shoelace do polígono
+desenhado, e todo vértice respeita `rj`/recuo lateral. **Falta a validação
+visual num navegador real com o mapa e o ArcGIS ao vivo** — pendência do lado
+do usuário ou de uma sessão sem essa restrição de proxy.
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
@@ -95,11 +160,19 @@ prioridade na colisão.
   Puppeteer instalado de forma persistente.
 - **Ler screenshot de headless:** o basemap CARTO não renderiza em headless (fundo
   escuro). Valide por medição numérica, não por leitura da imagem.
+- **Chromium headless sem HTTPS neste tipo de ambiente (Claude Code on the web):**
+  o Playwright/Puppeteer não completa handshake TLS com host externo nenhum
+  através do proxy do agente (RESET a meio do TLS; `curl` com o mesmo proxy
+  funciona). Ver detalhe no CLAUDE.md, seção Testes. Nessas sessões, teste a
+  geometria pura em Node isolado (sem DOM) em vez de insistir em abrir o browser.
 
 ## Pendências conhecidas
 
 - Conferência pontual (do seu lado) de ~17,5% de divergência de ZOT contra uma
   camada externa.
 - Conferência do visual final sobre o basemap CARTO ao vivo.
+- Validação em navegador real da rodada de correções do item 8 (recuo na planta,
+  laje física, torre implantada reancorada) — só testada com geometria pura nesta
+  sessão, por causa da restrição de proxy/Chromium acima.
 - Melhoria futura: agrupar faces colineares numa medida só na planta de situação,
   para lotes de contorno muito ruidoso.

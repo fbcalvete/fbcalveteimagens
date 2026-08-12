@@ -301,6 +301,10 @@ table.q tr.em td{color:var(--paper)} table.q tr.em td:last-child{color:var(--bp)
       <div class="chk" style="margin-top:2px"><input type="checkbox" id="modoLaje"><label for="modoLaje" style="margin:0">Respeitar a área de laje alvo (não maximizar a altura)</label></div>
       <div class="hint" style="margin-top:2px">Por padrão a configuração ótima busca o máximo de CA e a altura máxima; a laje resulta daí. Marque para dimensionar pela laje alvo (unidades × privativa ÷ fator) e, se couber, reduzir a altura.</div>
       <div class="row2">
+        <div class="f"><label>Laje alvo — torre implantada (m²)</label><input id="ovLajeImplant" type="number" step="10" min="30" value="600"></div>
+        <div class="f" style="align-self:end"><div class="hint" style="margin:0">Só vale quando o terreno é irregular demais para a torre natural (laje &lt; 80 m²). Reduzir a área ganha recuo e permite subir mais; aumentar exige mais altura para caber.</div></div>
+      </div>
+      <div class="row2">
         <div class="f"><label>Uso da base isenta</label><select id="usoBase"><option value="gar">Estacionamento (não computa CA)</option><option value="com">Uso computável (comercial/outro)</option></select></div>
         <div class="f" style="align-self:end"><div class="hint" style="margin:0">A base isenta é modelada como 3 pavimentos de ~4,17 m (12,5 m) na divisa. Como estacionamento, não entra no CA — o coeficiente todo vai para a torre.</div></div>
       </div>
@@ -602,28 +606,100 @@ function pontoNoPoligono(p, anel){
   return dentro;
 }
 /* Torre implantada: quando os recuos inviabilizam a laje pela erosao do
-   poligono irregular, insere-se um retangulo compacto (~alvo m2) recuado
-   da MAIOR frente e — respeitando o recuo lateral da regra (fLat da altura,
-   18% ou 15% conforme a testada) — contido no lote erodido. Busca a MAIOR
-   altura em que ainda cabe ~alvo de laje; abaixo dessa altura o recuo e
-   menor, entao o retangulo tambem cabe. */
+   poligono irregular, insere-se uma laje compacta (alvo, editavel, 600 m2
+   por padrao) sempre ancorada na MAIOR testada do lote — centralizada nela
+   e encostada no recuo de jardim; se essa testada faz esquina com outra
+   frente, a ancora vai para o vertice da esquina em vez do meio da testada.
+   Comeca quadrada; se o recuo lateral nao deixa fechar o alvo num retangulo,
+   reduz o retangulo e, se ainda faltar area, deforma a laje seguindo o
+   contorno legal (busca radial a partir do retangulo encontrado) em vez de
+   insistir num formato reto. Sobe ate a maior altura em que a laje (do
+   tamanho que couber) ainda cabe respeitando o recuo no topo. */
 function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd){
   const anel = T.anel;
   const nv = anel.length-1;
   if(nv < 3) return null;
-  /* orientacao principal: direcao media das FRENTES (ponderada pelo
-     comprimento; angulo dobrado para tratar sentidos opostos como iguais).
-     Sem frentes, usa o eixo mais longo do bbox. */
-  let sx=0, sy=0, temFrente=false;
-  for(const e of T.arestas) if(e.tipo==='frente'){
-    const ex=e.b[0]-e.a[0], ey=e.b[1]-e.a[1], L=Math.hypot(ex,ey); if(L<1) continue;
-    const a2=Math.atan2(ey,ex)*2; sx+=Math.cos(a2)*L; sy+=Math.sin(a2)*L; temFrente=true;
-  }
+  const arestas = T.arestas||[];
   const bb=(function(){let a=[1e9,1e9,-1e9,-1e9];for(const q of anel){a[0]=Math.min(a[0],q[0]);a[1]=Math.min(a[1],q[1]);a[2]=Math.max(a[2],q[0]);a[3]=Math.max(a[3],q[1]);}return a;})();
-  let ax;
-  if(temFrente && (sx||sy)) ax=Math.atan2(sy,sx)/2;
-  else ax = (bb[2]-bb[0])>=(bb[3]-bb[1]) ? 0 : Math.PI/2;
-  const dx=Math.cos(ax), dy=Math.sin(ax), nx=-dy, ny=dx;
+  const centro = anel.slice(0,-1).reduce((a,p)=>[a[0]+p[0],a[1]+p[1]],[0,0]).map(v=>v/(anel.length-1));
+
+  /* liga cada aresta do ANEL (a geometria costurada, usada no desenho) ao
+     tipo classificado mais proximo em T.arestas — a mesma tolerancia usada
+     em outros lugares do app (svgSituacao) porque a costura nao preserva
+     vertice-a-vertice. */
+  const arestasAnel = [];
+  for(let i=0;i<nv;i++){
+    const a=anel[i], b=anel[i+1], mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    let e = arestas.find(x=>Math.hypot(((x.a[0]+x.b[0])/2)-mid[0], ((x.a[1]+x.b[1])/2)-mid[1])<1.5);
+    if(!e){
+      let bd=1e9;
+      for(const x of arestas){ const d=Math.hypot(x.a[0]-a[0],x.a[1]-a[1])+Math.hypot(x.b[0]-b[0],x.b[1]-b[1]); if(d<bd){bd=d;e=x;} }
+      if(bd>4) e=null;
+    }
+    arestasAnel.push({a:a, b:b, tipo: e?e.tipo:'divisa'});
+  }
+  if(!arestasAnel.some(e=>e.tipo==='frente')) return null;
+
+  /* agrupa corridas contiguas de arestas 'frente' no anel (contorna o
+     wraparound do anel fechado) */
+  const isF = arestasAnel.map(e=>e.tipo==='frente');
+  let ini=0; while(ini<nv && isF[ini]) ini++;
+  const grupos=[];
+  if(ini===nv){ grupos.push(arestasAnel.slice()); }
+  else{
+    let i=ini%nv, visto=0;
+    while(visto<nv){
+      if(isF[i]){ const g=[]; while(isF[i]){ g.push(arestasAnel[i]); i=(i+1)%nv; visto++; if(visto>=nv) break; } grupos.push(g); }
+      else { i=(i+1)%nv; visto++; }
+    }
+  }
+  const compr = g => g.reduce((s,e)=>s+Math.hypot(e.b[0]-e.a[0],e.b[1]-e.a[1]),0);
+  const grupo = grupos.reduce((m,g)=> compr(g)>compr(m) ? g : m);
+
+  /* esquina: maior mudanca de direcao entre arestas consecutivas do grupo,
+     acima de ~25 graus. O lado mais comprido junto ao vertice da esquina
+     define a orientacao da laje. */
+  const ANG_ESQUINA = 25*Math.PI/180;
+  let idxEsquina=-1, maiorAng=0;
+  for(let k=0;k<grupo.length-1;k++){
+    const d1=[grupo[k].b[0]-grupo[k].a[0], grupo[k].b[1]-grupo[k].a[1]];
+    const d2=[grupo[k+1].b[0]-grupo[k+1].a[0], grupo[k+1].b[1]-grupo[k+1].a[1]];
+    const l1=Math.hypot(d1[0],d1[1])||1, l2=Math.hypot(d2[0],d2[1])||1;
+    const cosA=Math.max(-1,Math.min(1,(d1[0]*d2[0]+d1[1]*d2[1])/(l1*l2)));
+    const ang=Math.acos(cosA);
+    if(ang>maiorAng){ maiorAng=ang; idxEsquina=k; }
+  }
+  let dirRef, ancora, esquina=false;
+  if(idxEsquina>=0 && maiorAng>ANG_ESQUINA){
+    esquina = true;
+    const ladoA=grupo.slice(0,idxEsquina+1), ladoB=grupo.slice(idxEsquina+1);
+    /* o vertice da esquina fica numa PONTA da laje (nao no meio) — a laje
+       estende do vertice para dentro do lado escolhido, entao dirRef aponta
+       do vertice PARA LONGE dele (nao o contrario). */
+    const cornerPt = grupo[idxEsquina].b;
+    let longe;
+    if(compr(ladoA)>=compr(ladoB)) longe = ladoA[0].a; else longe = ladoB[ladoB.length-1].b;
+    dirRef=[longe[0]-cornerPt[0], longe[1]-cornerPt[1]];
+    ancora = cornerPt.slice();
+  } else {
+    const e0=grupo[0], e1=grupo[grupo.length-1];
+    dirRef=[e1.b[0]-e0.a[0], e1.b[1]-e0.a[1]];
+    /* ponto no meio do comprimento acumulado do grupo (centraliza na testada
+       real, nao na corda reta, quando ha leve curvatura) */
+    const metade=compr(grupo)/2;
+    let acc=0; ancora=grupo[grupo.length-1].b.slice();
+    for(const e of grupo){
+      const L=Math.hypot(e.b[0]-e.a[0],e.b[1]-e.a[1]);
+      if(acc+L>=metade){ const t=L>0?(metade-acc)/L:0; ancora=[e.a[0]+(e.b[0]-e.a[0])*t, e.a[1]+(e.b[1]-e.a[1])*t]; break; }
+      acc+=L;
+    }
+  }
+  const dl=Math.hypot(dirRef[0],dirRef[1])||1;
+  const dx=dirRef[0]/dl, dy=dirRef[1]/dl;
+  let nx=-dy, ny=dx;
+  /* normal para DENTRO do lote (em direcao ao centroide) */
+  if((ancora[0]+nx-centro[0])**2+(ancora[1]+ny-centro[1])**2 > (ancora[0]-nx-centro[0])**2+(ancora[1]-ny-centro[1])**2){ nx=-nx; ny=-ny; }
+
   const ret=(cx,cy,w,d)=>[
     [cx-dx*w/2-nx*d/2, cy-dy*w/2-ny*d/2], [cx+dx*w/2-nx*d/2, cy+dy*w/2-ny*d/2],
     [cx+dx*w/2+nx*d/2, cy+dy*w/2+ny*d/2], [cx-dx*w/2+nx*d/2, cy-dy*w/2+ny*d/2]];
@@ -631,40 +707,76 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd){
      nas divisas) — robusto ao slivering do recorte em contornos ruidosos */
   const pontoOk=(p, rLat)=>{
     if(!pontoNoPoligono(p, anel)) return false;
-    for(const e of T.arestas){
+    for(const e of arestas){
       const r = e.tipo==='frente' ? rj : rLat;
       if(distPtSeg(p[0],p[1], e.a[0],e.a[1], e.b[0],e.b[1]) < r-0.05) return false;
     }
     return true;
   };
-  const diag=Math.hypot(bb[2]-bb[0], bb[3]-bb[1]);
-  /* maior retangulo (ate alvo) que cabe centrado em (cx,cy) na orientacao dada */
-  const fitAt=(cx,cy,rLat)=>{
-    let W=Math.min(diag, Math.sqrt(alvo*1.5)), D=alvo/W;
-    for(let it=0; it<8; it++){
+
+  /* laje retangular, comecando quadrada no alvo, sempre encostada no recuo
+     de jardim a partir da ancora (centro da testada ou vertice da esquina) */
+  const ajustar=(rLat)=>{
+    let W=Math.sqrt(alvo), D=alvo/W;
+    for(let it=0; it<26; it++){
+      /* na esquina a ancora e o vertice do lote, numa PONTA da laje — desloca
+         rj+meia largura para dentro do lado escolhido (a laje tambem precisa
+         ficar a rj de distancia da OUTRA frente, que corre ao longo do eixo
+         de profundidade), alem do recuo em profundidade. Na testada sem
+         esquina a ancora ja e o meio da testada. */
+      const cx=ancora[0]+(esquina?dx*(rj+W/2):0)+nx*(rj+D/2), cy=ancora[1]+(esquina?dy*(rj+W/2):0)+ny*(rj+D/2);
       const c=ret(cx,cy,W,D);
       const mids=[[(c[0][0]+c[1][0])/2,(c[0][1]+c[1][1])/2],[(c[1][0]+c[2][0])/2,(c[1][1]+c[2][1])/2],
                   [(c[2][0]+c[3][0])/2,(c[2][1]+c[3][1])/2],[(c[3][0]+c[0][0])/2,(c[3][1]+c[0][1])/2]];
-      if(c.concat(mids, [[cx,cy]]).every(p=>pontoOk(p,rLat))) return {anel:c.concat([c[0]]), area:W*D, W:W, D:D};
-      W*=0.9; D*=0.9;
+      if(c.concat(mids, [[cx,cy]]).every(p=>pontoOk(p,rLat))) return {anel:c.concat([c[0]]), area:W*D, W:W, D:D, cx:cx, cy:cy};
+      W*=0.96; D*=0.96;
+      if(W*D<40) return null;
     }
     return null;
   };
-  /* varre alturas (grosso) x centros numa grade; guarda a de maior area x altura */
-  const area0=(bb[2]-bb[0])*(bb[3]-bb[1]);
-  const step=Math.max(2.5, Math.sqrt(area0)/14);
-  const dH=Math.max(pd, (hMax-Hbase)/6);
+  /* quando o retangulo nao fecha o alvo, deforma a laje: busca radial do
+     maior contorno legal a partir do centro do melhor retangulo, depois
+     escala de volta ao alvo se sobrar espaco — segue o desenho real dos
+     recuos em vez de insistir numa forma reta */
+  const deformar=(centroL, rLat, raioMax)=>{
+    const N=64, pts=[];
+    for(let k=0;k<N;k++){
+      const ang=k/N*Math.PI*2, ux=Math.cos(ang), uy=Math.sin(ang);
+      if(!pontoOk(centroL, rLat)){ pts.push(centroL.slice()); continue; }
+      let lo=0, hi=raioMax;
+      for(let it=0; it<24; it++){ const mid=(lo+hi)/2; const p=[centroL[0]+ux*mid, centroL[1]+uy*mid]; if(pontoOk(p,rLat)) lo=mid; else hi=mid; }
+      pts.push([centroL[0]+ux*lo, centroL[1]+uy*lo]);
+    }
+    pts.push(pts[0]);
+    return pts;
+  };
+
+  /* sobe altura ate a maior em que a laje (do tamanho que couber) ainda
+     cabe respeitando o recuo no topo */
+  const dH=Math.max(pd, (hMax-Hbase)/8);
   let melhor=null, melhorScore=0;
   for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
     const rLat = H > baseIsenta ? fLat*H : 0;
-    for(let gx=bb[0]+step*0.5; gx<=bb[2]; gx+=step)
-      for(let gy=bb[1]+step*0.5; gy<=bb[3]; gy+=step){
-        if(!pontoNoPoligono([gx,gy], anel)) continue;
-        const r=fitAt(gx,gy,rLat);
-        if(r && r.area>40){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={anel:r.anel, area:r.area, W:r.W, D:r.D, H:H}; } }
-      }
+    const r = ajustar(rLat);
+    if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
   }
-  return melhor;
+  if(!melhor) return null;
+
+  let anelF=melhor.r.anel, areaF=melhor.r.area, Wf=melhor.r.W, Df=melhor.r.D;
+  if(areaF < alvo*0.98){
+    const raioMax=Math.hypot(bb[2]-bb[0], bb[3]-bb[1]);
+    const estrela = deformar([melhor.r.cx, melhor.r.cy], melhor.rLat, raioMax);
+    let areaE = Math.abs(areaAnel(estrela));
+    if(areaE > areaF+1){
+      if(areaE > alvo){
+        const k=Math.sqrt(alvo/areaE);
+        for(let i=0;i<estrela.length;i++) estrela[i]=[melhor.r.cx+(estrela[i][0]-melhor.r.cx)*k, melhor.r.cy+(estrela[i][1]-melhor.r.cy)*k];
+        areaE = Math.abs(areaAnel(estrela));
+      }
+      anelF=estrela; areaF=areaE; Wf=undefined; Df=undefined;
+    }
+  }
+  return {anel:anelF, area:areaF, W:Wf, D:Df, H:melhor.H};
 }
 function recortar(anel, recuos){
   let poly = anel.slice(0,-1);
@@ -1430,8 +1542,10 @@ function resolver(){
      frente. Usa a MAIOR laje possivel da torre natural como criterio. */
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
+  const ovLajeVazio = !$('ovLajeImplant') || $('ovLajeImplant').value.trim() === '';
+  const alvoLajeImplant = ovLajeVazio ? 600 : Math.max(30, num('ovLajeImplant'));
   if(maxLajeNat < 80 && nMaxTorre >= 1){
-    const ti = torreImplantada(T, 600, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd);
+    const ti = torreImplantada(T, alvoLajeImplant, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
       const nCA = acMax > acBase ? Math.floor((acMax-acBase)/ti.area) : 0;
@@ -1458,7 +1572,11 @@ function resolver(){
 
   /* 5.7 consolidacao */
   const acTotal = best.acTotal, privativa = acTotal*fator;
-  const lajeReal = best.nT ? best.acTorre/best.nT : 0;
+  /* lajeReal = area FISICA do pavimento (a mesma do poligono best.anel
+     desenhado nas plantas e no 3D). Antes usava best.acTorre/best.nT
+     (media da area computavel, que cai quando o CA satura antes do ultimo
+     pavimento) e por isso divergia do que a planta mostrava. */
+  const lajeReal = best.laje || 0;
   const undPav = num('m2Uni') > 0 ? (lajeReal*fator)/num('m2Uni') : 0;
   const unidades = Math.floor(undPav)*best.nT;
   const vagas = Math.ceil(unidades*num('vagUni'));
@@ -2085,12 +2203,33 @@ function svgSituacao(s){
   for(let i=0;i<anel.length-1;i++){ const a=anel[i],b=anel[i+1],len=Math.hypot(b[0]-a[0],b[1]-a[1]);
     const rc=recDe(i,a,b); if(!(rc.r>0.05)) continue;
     if(rc.front){ if(len>lFr){lFr=len;iFr=i;} } else if(len>lDv){lDv=len;iDv=i;} }
-  /* linhas de recuo nas faces significativas */
-  for(let i=0;i<anel.length-1;i++){ const a=anel[i],b=anel[i+1],len=Math.hypot(b[0]-a[0],b[1]-a[1]);
-    if(len<6) continue; const rc=recDe(i,a,b); if(!(rc.r>0.05)) continue;
-    const {nx,ny}=normalDentro(a,b);
-    const a2=[a[0]+nx*rc.r,a[1]+ny*rc.r], b2=[b[0]+nx*rc.r,b[1]+ny*rc.r];
-    g+='<line x1="'+X(a2[0]).toFixed(1)+'" y1="'+Y(a2[1]).toFixed(1)+'" x2="'+X(b2[0]).toFixed(1)+'" y2="'+Y(b2[1]).toFixed(1)+'" stroke="'+(rc.front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
+  /* linhas de recuo: um UNICO contorno (o mesmo recorte por meio-planos do
+     calculo do envelope, T.arestas ja e uma ordenacao CCW consistente),
+     nao um segmento independente por aresta do terreno. Antes cada aresta
+     desenhava sua propria linha, sem juntar nos cantos ("linhas soltas");
+     agora o tracejado acompanha a conformacao real do terreno, com os
+     vertices dos cantos compartilhados entre segmentos vizinhos. */
+  const recuosDef = arr.map(e=>({a:e.a, b:e.b, r: e.tipo==='frente'?s.rjEfetivo:(s.best.rDiv||0), front:e.tipo==='frente'}));
+  const recPoly = recortar(anel, recuosDef);
+  if(recPoly.anel && recPoly.anel.length>2){
+    for(let i=0;i<recPoly.anel.length-1;i++){
+      const a=recPoly.anel[i], b=recPoly.anel[i+1], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(len<0.15) continue;
+      const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+      /* classifica o segmento pela reta de recuo original mais proxima
+         (mesma formula de offset usada dentro de recortar()) para colorir
+         jardim x lateral */
+      let front=false, melhorD=1e9;
+      for(const rd of recuosDef){
+        if(!(rd.r>0.05)) continue;
+        const ex=rd.b[0]-rd.a[0], ey=rd.b[1]-rd.a[1], el=Math.hypot(ex,ey)||1;
+        const onx=-ey/el, ony=ex/el;
+        const off=[rd.a[0]+onx*rd.r, rd.a[1]+ony*rd.r];
+        const d=Math.abs((mid[0]-off[0])*(ey/el) - (mid[1]-off[1])*(ex/el));
+        if(d<melhorD){ melhorD=d; front=rd.front; }
+      }
+      g+='<line x1="'+X(a[0]).toFixed(1)+'" y1="'+Y(a[1]).toFixed(1)+'" x2="'+X(b[0]).toFixed(1)+'" y2="'+Y(b[1]).toFixed(1)+'" stroke="'+(front?'#f2a03d':'#6fb2ff')+'" stroke-width="1" stroke-dasharray="7 3 2 3" opacity=".85"/>';
+    }
   }
   /* medidas de cada face do terreno (prioridade na colisao) */
   for(let i=0;i<anel.length-1;i++){
@@ -2228,7 +2367,7 @@ if($('fecharPlantas')) $('fecharPlantas').addEventListener('click', ()=>$('telaP
 
 /* inputs numericos comuns: recalculam a cada digito */
 ['pctA','uniPav','m2Uni','fator','pd','nSub','vagUni','m2Vaga','pctSub','vmt','fp',
- 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase']
+ 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase','ovLajeImplant']
   .forEach(id => { const el=$(id); if(el) el.addEventListener('input', calcular); });
 /* % da ZOT combinada muda o regime base: reflete nos campos e recalcula */
 $('pctA').addEventListener('input', preencherRegime);

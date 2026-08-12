@@ -45,6 +45,21 @@ não computa CA; subsolo 0; ruas via eixos aparecem; cotas+recuo no 3D; toggle
 desliga base; rótulo é plano (não sprite); 3D desenha; mancha bege em z15 = 0,0%;
 plantas abrem (situação + corte).
 
+**Limitação conhecida deste ambiente (Claude Code on the web, container isolado):**
+o Chromium headless (Playwright, `/opt/pw-browsers`) não consegue completar o
+handshake TLS de nenhum host HTTPS externo através do proxy do agente — o `curl`
+com o mesmo proxy funciona normalmente, mas o Chromium recebe `ERR_CONNECTION_RESET`
+a meio do TLS (confirmado via `--log-net-log`: o RESET vem depois do Client Hello,
+antes do Server Hello — não é allowlist de host, pois acontece até com hosts em
+`no_proxy`). Isso bloqueia o teste Puppeteer/Playwright end-to-end de verdade
+(carregar o mapa, buscar lotes no ArcGIS, renderizar) **neste tipo de sessão**.
+Se isso acontecer de novo: não insista em flags de TLS do Chromium — em vez disso,
+extraia as funções de geometria puras (`areaAnel`, `pontoNoPoligono`, `recortar`,
+`torreImplantada`, `distPtSeg`, etc. — todas sem DOM) para um módulo Node isolado
+e teste com lotes sintéticos (ver `torreImplantada` acima). Isso cobre a lógica;
+a verificação visual no navegador real (com mapa e ArcGIS ao vivo) fica pendente
+do lado do usuário, ou de uma sessão local/self-hosted sem essa restrição de proxy.
+
 ---
 
 ## Fontes de dados (ArcGIS da prefeitura, CORS aberto)
@@ -82,23 +97,46 @@ Regras-chave da LUOS embutidas:
   'implantada'.
 - **Retorno** inclui, entre outros: `R, T, best, trava, lajeReal, nSub, areaSubsolo,
   nBase, pdBase, Hbase, baseComputa, envB, pd, rj, rjEfetivo, baseIsenta, implantada,
-  hMax`. `best = {nT, H, laje, anel, rDiv, acTorre, acTotal, sat, (W,D se implantada)}`.
+  hMax`. `best = {nT, H, laje, anel, rDiv, acTorre, acTotal, sat, (W,D se implantada
+  e a laje ficou retangular; ausentes se a laje foi deformada)}`.
   `T = {anel, arestas (tipo frente/divisa, a, b), area, testada, largura, prof, ...}`.
+- **`lajeReal`** (área de laje mostrada em toda a UI/plantas/corte) é **sempre**
+  `best.laje`, a área física do polígono `best.anel` (a mesma que é desenhada) —
+  nunca `acTorre/nT`. Essa média por CA computável diverge do físico sempre que o
+  coeficiente satura antes do último pavimento ou a torre afunila com a altura, e
+  foi a causa de um bug real (planta mostrando uma laje e o texto mostrando outra
+  área). Se mexer no cálculo de `lajeReal`, derive sempre do polígono, nunca do CA.
 
 ## Torre implantada (lotes irregulares)
 
 Quando os recuos inviabilizam a torre natural (laje ~0, por slivering do recorte
-em polígonos de muitos vértices), o programa **reparte o terreno**: insere um
-retângulo compacto (alvo ~600 m²) na parte larga do corpo voltada para a frontagem.
+em polígonos de muitos vértices), o programa **reparte o terreno**: insere uma
+laje compacta (alvo editável em `#ovLajeImplant`, 600 m² por padrão) sempre
+ancorada na **maior testada** do lote.
 
 - Gatilho: maior laje da torre natural < 80 m² **e** a implantada rende mais.
-- **Respeita o recuo lateral** (18%/15% da altura) — checado por distância de cada
-  canto/meio de aresta a cada divisa (robusto ao slivering; NÃO usa o recorte por
-  semiplanos, que colapsa em contornos ruidosos).
-- **Posição por busca em grade**: varre centros no lote e acha a maior posição do
-  retângulo que respeita o recuo; orientação vem da direção média das frentes
-  (não da maior aresta única — que, fragmentada, caía no vértice reentrante do L).
-- Sobe até a maior altura em que a laje ainda cabe respeitando o recuo no topo.
+- **Ancoragem**: centralizada na maior testada (`torreImplantada()` agrupa arestas
+  `frente` contíguas no anel — com wraparound — e pega o grupo de maior soma de
+  comprimento). Se essa testada faz esquina com outra frente (mudança de direção
+  > 25° dentro do grupo), a laje ancora **no vértice da esquina** em vez do meio —
+  nesse caso ela fica **a `rj` de distância de AMBAS as frentes**, não só da de
+  referência (bug real: a primeira versão só afastava da frente de referência e
+  colava a laje em cima da outra).
+- **Formato**: começa quadrada no alvo, encostada no recuo de jardim. Se o recuo
+  lateral não deixa fechar o alvo num retângulo, encolhe (mantendo quadrado/
+  proporção) até caber. Se ainda faltar área para o alvo, **deforma**: busca radial
+  (64 raios, busca binária) a partir do centro do melhor retângulo, seguindo o
+  contorno legal real (não o recorte por semiplanos, que sliverriza em contornos
+  ruidosos) — se sobrar área além do alvo, escala de volta para o alvo exato.
+  A área de `ti.area` é sempre `Math.abs(areaAnel(ti.anel))` — casa 100% com o
+  polígono desenhado.
+- Sobe até a maior altura em que a laje (do tamanho que couber) ainda cabe
+  respeitando o recuo no topo — **reduzir o alvo de área ganha altura**; aumentar
+  exige altura menor (mesmo mecanismo, agora exposto ao usuário via `#ovLajeImplant`).
+- Testado com funções puras extraídas (sem browser) em 4 cenários sintéticos:
+  testada única sem esquina, lote de esquina, lote estreito forçando deformação, e
+  o mesmo lote de esquina com alvo menor (confirma o trade-off área↔altura). Os 4
+  passam com área reportada == área do polígono e distâncias de recuo respeitadas.
 
 ## 3D (Three.js r128, `desenhar(s)`)
 
@@ -123,10 +161,18 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
 1. **Situação** — SEMPRE com o **norte para cima** (o Y projetado cresce para o
    Norte; a tela espelha Y). Mostra a medida de cada face do terreno, o
    empreendimento sobreposto, as medidas da laje, e os **recuos como linhas de eixo
-   tracejadas (dash-dot)** paralelas às faces — âmbar (recuo de jardim) e azul
-   (recuo lateral) — com o valor cotado uma vez por tipo (maior frente e maior
-   divisa) para não poluir em lotes de muitos vértices. Anti-sobreposição dos
-   rótulos por AABB; medidas das faces têm prioridade.
+   tracejadas (dash-dot)** — âmbar (recuo de jardim) e azul (recuo lateral) — com o
+   valor cotado uma vez por tipo (maior frente e maior divisa) para não poluir em
+   lotes de muitos vértices. Anti-sobreposição dos rótulos por AABB; medidas das
+   faces têm prioridade.
+   **O tracejado é UM contorno só** (`recortar(anel, recuos)`, o mesmo recorte por
+   meio-planos usado no cálculo do envelope — não desenha mais um segmento
+   independente por aresta do terreno). Antes cada aresta original desenhava sua
+   própria linha offset, sem juntar nos cantos ("linhas soltas" — bug real
+   reportado pelo usuário); agora os vértices dos cantos são compartilhados entre
+   segmentos vizinhos, então o tracejado acompanha a conformação real do terreno.
+   A cor de cada segmento é decidida por distância perpendicular à reta de recuo
+   original mais próxima (mesma fórmula de offset do `recortar`).
 2. **Corte esquemático** — altura atingida (cota), embasamento (base isenta),
    torre recuada acima (recuo lateral cotado), subsolos, e resumo textual.
 
@@ -136,11 +182,21 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
 
 - Concluído: ruas via eixos; base isenta editável+toggle; base=estacionamento;
   subsolo 0; otimizador de altura com laje-alvo; rótulos de chão OBB no 3D;
-  `ovBase=0` corrigido; torre implantada respeitando recuo lateral e posicionada
-  na parte larga por busca em grade; página "Ver Plantas" (situação norte-para-cima
-  + corte) refletindo o modelo; recuos como linhas de eixo com valor na situação.
+  `ovBase=0` corrigido; página "Ver Plantas" (situação norte-para-cima + corte)
+  refletindo o modelo; recuos como linhas de eixo com valor na situação.
+- Concluído (rodada de correções na planta de situação e na torre implantada):
+  linha de recuo na planta de situação virou um contorno único conectado (era
+  segmentos soltos por aresta); `lajeReal` agora sempre casa com a área física do
+  polígono desenhado (era uma média por CA computável, podia divergir bastante);
+  área-alvo da laje da torre implantada virou parâmetro editável
+  (`#ovLajeImplant`, 600 m² por padrão); torre implantada reancorada — sempre na
+  maior testada, centralizada nela ou no vértice se fizer esquina, encostada no
+  recuo de jardim (de ambas as frentes na esquina), e deforma (busca radial) em
+  vez de só encolher quando o alvo não fecha num retângulo.
 - Em aberto (do lado do usuário): conferência pontual de ~17,5% de divergência de
   ZOT contra uma camada externa; conferência do visual final sobre o basemap CARTO
-  ao vivo.
+  ao vivo; **validação em navegador real** da rodada de correções acima (só foi
+  possível testar a geometria pura nesta sessão — ver limitação de ambiente na
+  seção de Testes).
 - Ideia futura: agrupar faces colineares numa medida só, para lotes de contorno
   muito ruidoso (evita rótulos minúsculos espremidos).
