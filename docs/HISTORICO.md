@@ -290,6 +290,66 @@ segmentos esperados aparecem, cada um com uma linha de halo E uma linha
 colorida no SVG gerado. Segue pendente a confirmação visual num navegador de
 verdade (mesma limitação de proxy/Chromium das rodadas anteriores).
 
+## 12. "Laje alvo" deixa de ser só da torre implantada — decisão do usuário
+Depois da correção do item 11, o usuário testou outro lote real (grande,
+CA praticamente esgotado) e viu a laje da tabela da esquerda (o campo "Laje
+alvo — torre implantada", 660 m² digitado) divergir da laje mostrada no
+resultado (1.189 m²). Não era o mesmo bug do item 11 (a área mostrada batia
+com o polígono desenhado) — era um limite de escopo por design: aquele lote
+não estava usando torre implantada (o CA é que travava, `trava: 'ia'`), e o
+campo só valia nesse caso, por hint explícito na UI. O usuário queria que
+mexer nesse campo sempre ajustasse o modelo.
+
+Antes de mudar, perguntei diretamente (via pergunta de esclarecimento):
+manter o escopo atual (só torre implantada), expandir pra qualquer torre
+(mesmo com CA sobrando), ou unificar com o checkbox "Respeitar a área de
+laje alvo" que já existia (um mecanismo PARALELO e mais antigo, baseado em
+unidades×privativa÷fator, que só valia pra torre natural e só quando
+marcado). **O usuário escolheu expandir pra qualquer torre** — e essa
+escolha, por natureza, substituía o checkbox antigo (os dois mecanismos
+faziam a mesma coisa por caminhos diferentes; manter os dois ao mesmo tempo
+seria confuso).
+
+**Mudança implementada:**
+- Campo renomeado `#ovLajeImplant` → `#ovLajeAlvo` ("Laje alvo (m²)"),
+  hint text generalizado.
+- Checkbox "Respeitar a área de laje alvo" (`#modoLaje`) removido — o
+  comportamento que ele controlava (mirar uma laje alvo em vez de maximizar
+  altura) virou o PADRÃO, sempre ativo.
+- Campo "Unidades por pavimento" (`#uniPav`) removido — ficou órfão: só
+  existia para compor `lajeDesejada = uniPav × m2Uni ÷ fator`, e essa conta
+  foi substituída por `lajeDesejada = alvoLaje` (direto do novo campo, em
+  m², sem depender de contagem de unidades). `m2Uni` continua — ainda é
+  usado para converter a laje RESULTANTE em número de unidades (`undPav`),
+  um cálculo diferente e ainda válido.
+- Seleção do pavimento: `best = cUser || alto` (antes: `(respeitarLaje &&
+  cUser) ? cUser : alto`) — agora SEMPRE prefere o pavimento que bate com a
+  laje alvo dentro do CA disponível; só cai no comportamento antigo
+  (maximizar altura, laje resultante do que sobrar) quando NENHUM pavimento
+  comporta o alvo.
+- Gatilho da torre implantada (item 11) reaproveita o mesmo `alvoLaje` — sem
+  duplicar leitura do campo.
+
+**Implicação importante, registrada para não surpreender depois**: essa é
+uma mudança de comportamento PADRÃO da ferramenta inteira, não um ajuste
+pontual. Em lotes grandes onde o envelope natural sobra bastante em relação
+a 600 m² nas alturas baixas, a torre agora para de subir mais cedo por
+padrão (mirando a laje, não mais o CA/altura máximos) — diferente do
+comportamento histórico do programa. Foi uma escolha explícita do usuário,
+feita cientes do trade-off (perguntei antes de implementar).
+
+**Verificação**: como `resolver()` depende de dezenas de campos de
+formulário, não dá pra chamar direto fora do navegador. Testado extraindo a
+LÓGICA de seleção (`cUser || alto`) com dados sintéticos de `curva`
+reproduzindo três casos: lote grande com laje encolhendo por altura (antes
+escolhia nT=15/laje=180 — um fiapo; agora escolhe nT=11/laje=600, batendo
+com o alvo); lote pequeno onde nada cabe no alvo (sem mudança — cai no
+comportamento antigo, como esperado); e o mesmo lote grande com alvo menor
+(300 em vez de 600), que corretamente sobe mais (nT=13 em vez de nT=11),
+confirmando o trade-off área↔altura pedido desde a primeira rodada. A
+suíte de 6 cenários de `torreImplantada()` (itens 8-10) continua passando
+sem regressão.
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
@@ -313,10 +373,13 @@ verdade (mesma limitação de proxy/Chromium das rodadas anteriores).
 - Conferência pontual (do seu lado) de ~17,5% de divergência de ZOT contra uma
   camada externa.
 - Conferência do visual final sobre o basemap CARTO ao vivo.
-- Validação em navegador real da rodada de correções dos itens 8-11 (recuo na
+- Validação em navegador real da rodada de correções dos itens 8-12 (recuo na
   planta, laje física, torre implantada reancorada, laje deformada sem cortar
   o recuo, botão laje retangular, gatilho da implantada, halo de contraste no
-  tracejado) — só testada com geometria pura/blocos extraídos nesta sessão,
-  por causa da restrição de proxy/Chromium acima.
+  tracejado, laje alvo valendo pra qualquer torre) — só testada com geometria
+  pura/lógica extraída nesta sessão, por causa da restrição de proxy/Chromium
+  acima. A mudança de escopo do item 12 merece atenção especial: confirmar que
+  o comportamento padrão (mirar a laje alvo, não mais maximizar altura) é
+  mesmo o que você quer em lotes onde não reparou ainda.
 - Melhoria futura: agrupar faces colineares numa medida só na planta de situação,
   para lotes de contorno muito ruidoso.

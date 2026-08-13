@@ -291,19 +291,14 @@ table.q tr.em td{color:var(--paper)} table.q tr.em td:last-child{color:var(--bp)
       <div class="gt">Produto</div>
       <div class="f"><label>Uso predominante</label><select id="uso"><option value="res">Residencial</option><option value="nres">Não residencial</option></select></div>
       <div class="row2">
-        <div class="f"><label>Unidades por pavimento</label><input id="uniPav" type="number" value="4" min="1"></div>
         <div class="f"><label>Privativa média (m²)</label><input id="m2Uni" type="number" value="70" step="1"></div>
-      </div>
-      <div class="row2">
         <div class="f"><label>Fator privativa / computável</label><input id="fator" type="number" value="0.75" step="0.01" min="0.4" max="1"></div>
-        <div class="f"><label>Pé-direito (m)</label><input id="pd" type="number" value="3.0" step="0.05"></div>
       </div>
-      <div class="chk" style="margin-top:2px"><input type="checkbox" id="modoLaje"><label for="modoLaje" style="margin:0">Respeitar a área de laje alvo (não maximizar a altura)</label></div>
-      <div class="hint" style="margin-top:2px">Por padrão a configuração ótima busca o máximo de CA e a altura máxima; a laje resulta daí. Marque para dimensionar pela laje alvo (unidades × privativa ÷ fator) e, se couber, reduzir a altura.</div>
       <div class="row2">
-        <div class="f"><label>Laje alvo — torre implantada (m²)</label><input id="ovLajeImplant" type="number" step="10" min="30" value="600"></div>
-        <div class="f" style="align-self:end"><div class="hint" style="margin:0">Só vale quando o terreno é irregular demais para a torre natural (laje &lt; 80 m²). Reduzir a área ganha recuo e permite subir mais; aumentar exige mais altura para caber.</div></div>
+        <div class="f"><label>Pé-direito (m)</label><input id="pd" type="number" value="3.0" step="0.05"></div>
+        <div class="f"><label>Laje alvo (m²)</label><input id="ovLajeAlvo" type="number" step="10" min="30" value="600"></div>
       </div>
+      <div class="hint" style="margin-top:2px">O pavimento-tipo mira essa área de laje — reduzir a área ganha recuo e permite subir mais; aumentar exige altura menor para caber. Também é o alvo da torre implantada, em terrenos irregulares demais para a torre natural.</div>
       <div class="row2">
         <div class="f"><label>Uso da base isenta</label><select id="usoBase"><option value="gar">Estacionamento (não computa CA)</option><option value="com">Uso computável (comercial/outro)</option></select></div>
         <div class="f" style="align-self:end"><div class="hint" style="margin:0">A base isenta é modelada como 3 pavimentos de ~4,17 m (12,5 m) na divisa. Como estacionamento, não entra no CA — o coeficiente todo vai para a torre.</div></div>
@@ -1635,24 +1630,28 @@ function resolver(){
                 acTorre:Math.max(0,total-acBase), acTotal:total,
                 sat:(acumTorre+acBase > acMax+.5)});
   }
-  /* 5.6 area de laje alvo (tipologia informada: apartamentos + circulacao) */
-  const lajeDesejada = (Math.max(1,Math.round(num('uniPav'))) * num('m2Uni')) / fator;
+  /* 5.6 area de laje alvo — vale SEMPRE, torre natural ou implantada
+     (decisao explicita do usuario: antes so valia com o checkbox "respeitar
+     laje alvo" marcado, e so via unidades x privativa; agora e um unico
+     parametro em m2 que rege os dois casos). Reduzir a area ganha recuo e
+     permite subir mais; aumentar exige altura menor para caber. */
+  const ovLajeVazio = !$('ovLajeAlvo') || $('ovLajeAlvo').value.trim() === '';
+  const alvoLaje = ovLajeVazio ? 600 : Math.max(30, num('ovLajeAlvo'));
+  const lajeDesejada = alvoLaje;
   let nUser = 0;
   for(const c of curva) if(lajeDesejada <= c.laje + .5 && (c.nT*lajeDesejada + acBase) <= acMax + .5) nUser = c.nT;
   const cUser = curva.find(c => c.nT === nUser) || null;
 
-  /* Objetivo base: maximo de CA e maxima altura. A torre sobe ate a altura
-     da ZOT; a laje de cada pavimento resulta dos recuos (que a reduzem em
-     altura) e o CA disponivel e distribuido nela. Como a base isenta e
-     estacionamento e NAO consome CA, todo o coeficiente vai para a torre:
-     sem isso, a base comeria o CA e a torre subiria faminta (lajes minimas
-     ou nulas). So quando o usuario pede laje alvo e que a altura pode cair. */
+  /* Objetivo: por padrao mira a laje alvo (acima) e sobe ate a maior altura
+     em que ela ainda cabe (cUser). So cai para o gabarito de altura/CA
+     maximos, sem mirar area nenhuma, quando NENHUM pavimento comporta a
+     laje alvo dentro do CA disponivel (cUser nulo). Como a base isenta e
+     estacionamento e NAO consome CA, todo o coeficiente vai para a torre. */
   let alto = null;
-  for(const c of curva) if(c.laje >= 1) alto = c;      /* pavimento mais alto viavel */
+  for(const c of curva) if(c.laje >= 1) alto = c;      /* pavimento mais alto viavel, fallback */
   if(!alto && curva.length) alto = curva[0];
 
-  const respeitarLaje = $('modoLaje') && $('modoLaje').checked;
-  let best = (respeitarLaje && cUser) ? cUser : alto;
+  let best = cUser || alto;
   /* sem torre (a altura da ZOT so comporta a base): a propria base e o resultado */
   if(!best) best = {nT:0,H:Hbase,laje:areaBase,anel:envB.anel,rDiv:0,
                     acTorre:0,acTotal:acBase,sat:false};
@@ -1673,11 +1672,9 @@ function resolver(){
      aparece na planta) e pequeno, nao so quando NENHUM pavimento presta. */
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
-  const ovLajeVazio = !$('ovLajeImplant') || $('ovLajeImplant').value.trim() === '';
-  const alvoLajeImplant = ovLajeVazio ? 600 : Math.max(30, num('ovLajeImplant'));
   const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
   if((maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
-    const ti = torreImplantada(T, alvoLajeImplant, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
+    const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
       const nCA = acMax > acBase ? Math.floor((acMax-acBase)/ti.area) : 0;
@@ -1697,7 +1694,7 @@ function resolver(){
 
   const chegouAltura = nMaxTorre === 0 || best.nT >= nMaxTorre;
   const trava = implantada ? 'implantada'
-              : (respeitarLaje && cUser) ? 'laje'
+              : cUser ? 'laje'
               : (best.sat ? 'ia'
               : (chegouAltura ? 'altura'
               : (areaBase < areaBaseBruta - 1 ? 'tp' : 'recuo')));
@@ -1753,15 +1750,15 @@ function render(s){
     altura:'O gabarito e o limite. Ha potencial e envelope sobrando: mais um pavimento nao cabe na altura da ZOT.',
     recuo:'Os afastamentos consomem a laje antes de o indice se esgotar. Subir mais estreita a torre e reduz o total; este e o ponto de inflexao.',
     tp:'A taxa de permeabilidade limita a ocupacao terrea. As medidas alternativas do Anexo 6 podem liberar parte dela.',
-    laje:'Altura dimensionada pela area de laje alvo (apartamentos + circulacao), nao pelo maximo. Desmarque a opcao para voltar a buscar a altura maxima.',
+    laje:'Altura dimensionada pela area de laje alvo, nao pelo maximo de CA/altura. Aumente a laje alvo para reduzir a altura, ou reduza para subir mais.',
     implantada:'Os recuos inviabilizavam a laje neste formato de lote. A torre foi implantada como um retangulo compacto (~600 m2) recuado da maior frente, repartindo o terreno em vez de ocupar toda a base — um ponto de partida a refinar.'
   }[s.trava];
 
   const cen = s.cUser
-    ? '<tr><td>Gabarito com a tipologia informada</td><td>'+s.cUser.nT+' pav.</td></tr>'
+    ? '<tr><td>Gabarito na laje alvo</td><td>'+s.cUser.nT+' pav.</td></tr>'
       +'<tr><td>Area privativa nesse cenario</td><td>'
       + fmt((s.cUser.acTorre + ((s.nBase && s.baseComputa) ? s.nBase*s.areaBase : 0))*s.fator,0) + ' m\u00b2</td></tr>'
-    : '<tr><td colspan="2" style="color:var(--bind)">A laje de '+fmt(s.lajeDesejada,0)+' m\u00b2 pedida pela tipologia nao cabe em nenhum gabarito.</td></tr>';
+    : '<tr><td colspan="2" style="color:var(--bind)">A laje alvo de '+fmt(s.lajeDesejada,0)+' m\u00b2 nao cabe em nenhum gabarito dentro do CA disponivel \u2014 usando o maximo de altura/CA.</td></tr>';
 
   const zk=$('zotA').value, zz=ZOT[zk];
   const kb=$('zotB').value, zb=ZOT[kb];
@@ -1816,7 +1813,7 @@ function render(s){
   + '<tr><td>Minimo apos conversao (Anexo 6)</td><td>'+fmt(s.permMinima,0)+' m\u00b2</td></tr></table>'
 
   + '<table class="q"><tr><th>Cenario da tipologia informada</th><th>\u2014</th></tr>'
-  + '<tr><td>Laje exigida pela tipologia</td><td>'+fmt(s.lajeDesejada,0)+' m\u00b2</td></tr>'+cen+'</table>'
+  + '<tr><td>Laje alvo</td><td>'+fmt(s.lajeDesejada,0)+' m\u00b2</td></tr>'+cen+'</table>'
 
   + (s.vc > 0 ? '<div class="note i"><b>Outorga onerosa estimada:</b> '+brl(s.vc)+' sobre '+fmt(s.excedente,0)+' m\u00b2 adicionais (art. 110).</div>' : '')
   + '<div class="note i"><b>Potencial:</b> '+s.notaCA+'</div>'
@@ -2554,12 +2551,12 @@ if($('btnPlantas')) $('btnPlantas').addEventListener('click', abrirPlantas);
 if($('fecharPlantas')) $('fecharPlantas').addEventListener('click', ()=>$('telaPlantas').classList.remove('on'));
 
 /* inputs numericos comuns: recalculam a cada digito */
-['pctA','uniPav','m2Uni','fator','pd','nSub','vagUni','m2Vaga','pctSub','vmt','fp',
- 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase','ovLajeImplant']
+['pctA','m2Uni','fator','pd','nSub','vagUni','m2Vaga','pctSub','vmt','fp',
+ 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase','ovLajeAlvo']
   .forEach(id => { const el=$(id); if(el) el.addEventListener('input', calcular); });
 /* % da ZOT combinada muda o regime base: reflete nos campos e recalcula */
 $('pctA').addEventListener('input', preencherRegime);
-['zotB','uso','zocup','rj','usoBase','origParc','alturaMenosRestr','baseIsOn','modoLaje']
+['zotB','uso','zocup','rj','usoBase','origParc','alturaMenosRestr','baseIsOn']
   .forEach(id => { const el=$(id); if(el) el.addEventListener('change', () => { pintarZot(); preencherRegime(); calcular(); }); });
 /* botao: devolve os valores do Anexo, descartando as ediçoes */
 if($('ovReset')) $('ovReset').addEventListener('click', () => { preencherRegime(); calcular(); });

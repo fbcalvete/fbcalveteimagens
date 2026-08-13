@@ -92,9 +92,14 @@ Regras-chave da LUOS embutidas:
 - **Uso da base** = estacionamento por padrão (`#usoBase = 'gar'`, não computa CA);
   `'com'` = uso computável.
 - **Subsolo** padrão 0 (`#nSub`).
-- **Otimizador** padrão = altura máxima; toggle `#modoLaje` respeita uma laje-alvo
-  (torre mais baixa). `trava` pode ser: 'ia', 'altura', 'recuo', 'tp', 'laje',
-  'implantada'.
+- **Otimizador**: por padrão mira a **laje alvo** (`#ovLajeAlvo`, 600 m² editável,
+  campo único que rege torre natural E implantada — decisão explícita do
+  usuário, ver seção "Laje alvo" abaixo) e sobe até a maior altura em que
+  ela ainda cabe dentro do CA disponível (`best = cUser || alto`). Só cai
+  para o gabarito de altura/CA máximos (`alto`, o pavimento mais alto viável,
+  sem mirar área nenhuma) quando NENHUM pavimento comporta a laje alvo
+  (`cUser` nulo — ex.: lote pequeno onde até o térreo já é menor que o alvo).
+  `trava` pode ser: 'ia', 'altura', 'recuo', 'tp', 'laje', 'implantada'.
 - **Retorno** inclui, entre outros: `R, T, best, trava, lajeReal, nSub, areaSubsolo,
   nBase, pdBase, Hbase, baseComputa, envB, pd, rj, rjEfetivo, baseIsenta, implantada,
   hMax`. `best = {nT, H, laje, anel, rDiv, acTorre, acTotal, sat, (W,D se implantada
@@ -107,17 +112,38 @@ Regras-chave da LUOS embutidas:
   foi a causa de um bug real (planta mostrando uma laje e o texto mostrando outra
   área). Se mexer no cálculo de `lajeReal`, derive sempre do polígono, nunca do CA.
 
+## Laje alvo (`#ovLajeAlvo`, painel esquerdo, 600 m² por padrão)
+
+Parâmetro **único** que rege o dimensionamento da torre, **natural ou
+implantada** — decisão explícita do usuário (havia um checkbox "Respeitar a
+área de laje alvo" separado, ligado a unidades×privativa, só para a torre
+natural, e um campo em m² separado só para a torre implantada; unificados
+num só campo depois que o usuário pediu que valesse sempre, mesmo com CA
+sobrando). Reduzir a área ganha recuo e permite subir mais; aumentar exige
+altura menor para caber — o mesmo mecanismo em ambos os casos:
+- **Torre natural**: `lajeDesejada = alvoLaje`; percorre `curva` (um envelope
+  por altura) e escolhe o `nT` mais alto cujo `laje >= lajeDesejada` **e**
+  caiba no CA (`cUser`). `best = cUser || alto` — só cai para `alto` (o
+  pavimento mais alto viável, sem mirar área nenhuma) quando NENHUM
+  pavimento comporta o alvo dentro do CA disponível.
+- **Torre implantada**: mesmo campo (`alvoLaje`) passado como `alvo` para
+  `torreImplantada()`, ver seção abaixo.
+- Testado com dados sintéticos de `curva` (lote grande com laje encolhendo
+  por altura, lote pequeno onde nada cabe no alvo, mesmo lote grande com
+  alvo menor): confirma que o padrão troca de "maximizar altura, laje
+  resultante" para "mirar o alvo, altura resultante", sem regressão nos
+  lotes onde o alvo não cabe em nenhum pavimento.
+
 ## Torre implantada (lotes irregulares)
 
 Quando os recuos inviabilizam a torre natural (laje ~0, por slivering do recorte
 em polígonos de muitos vértices), o programa **reparte o terreno**: insere uma
-laje compacta (alvo editável em `#ovLajeImplant`, 600 m² por padrão) sempre
-ancorada na **maior testada** do lote.
+laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
+**maior testada** do lote.
 
 - **Gatilho**: maior laje da torre natural < 80 m² **OU** a laje do pavimento
-  ESCOLHIDO (`best.laje`, o mais alto viável — o otimizador padrão maximiza
-  altura primeiro) < 80 m² — **e** a implantada rende mais. Cuidado: checar
-  só a maior laje entre TODOS os pavimentos (`maxLajeNat`) não basta — um
+  ESCOLHIDO (`best.laje`) < 80 m² — **e** a implantada rende mais. Cuidado:
+  checar só a maior laje entre TODOS os pavimentos (`maxLajeNat`) não basta — um
   lote pode ter laje boa num pavimento baixo mas só um fiapo no pavimento
   mais alto escolhido pelo otimizador (a laje encolhe com a altura, recuo
   cresce com H). Nesse caso `maxLajeNat` ficava ≥80 e o gatilho antigo nunca
@@ -172,7 +198,7 @@ ancorada na **maior testada** do lote.
   polígono desenhado.
 - Sobe até a maior altura em que a laje (do tamanho que couber) ainda cabe
   respeitando o recuo no topo — **reduzir o alvo de área ganha altura**; aumentar
-  exige altura menor (mesmo mecanismo, agora exposto ao usuário via `#ovLajeImplant`).
+  exige altura menor (mesmo mecanismo da laje alvo, ver seção acima).
 - Testado com funções puras extraídas (sem browser) em 6 cenários sintéticos:
   testada única sem esquina, lote de esquina, lote estreito forçando deformação,
   o mesmo lote de esquina com alvo menor (trade-off área↔altura), um lote em L
@@ -282,10 +308,18 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
   ocupa o envelope inteiro, por cair exatamente em cima do contorno sólido
   da torre numa cor quase igual — corrigido com um halo de contraste atrás
   do tracejado (ver seção "Plantas").
+- Concluído (4ª rodada, mudança de escopo pedida explicitamente pelo
+  usuário): o campo de área-alvo (renomeado `#ovLajeImplant` → `#ovLajeAlvo`,
+  "Laje alvo") deixou de valer só para a torre implantada — agora rege
+  também a torre natural, sempre (não mais atrás do checkbox "Respeitar a
+  área de laje alvo", que foi removido, nem via unidades×privativa). O campo
+  "Unidades por pavimento" (`uniPav`) também foi removido — ficou órfão
+  depois que `lajeDesejada` passou a vir direto de `#ovLajeAlvo` em m², não
+  mais de `uniPav × m2Uni ÷ fator`. Ver seção "Laje alvo".
 - Em aberto (do lado do usuário): conferência pontual de ~17,5% de divergência de
   ZOT contra uma camada externa; conferência do visual final sobre o basemap CARTO
-  ao vivo; **validação em navegador real** da 2ª rodada de correções (só foi
-  possível testar a geometria pura nesta sessão — ver limitação de ambiente na
-  seção de Testes).
+  ao vivo; **validação em navegador real** da 2ª, 3ª e 4ª rodadas de correções (só
+  foi possível testar a geometria pura/lógica extraída nesta sessão — ver
+  limitação de ambiente na seção de Testes).
 - Ideia futura: agrupar faces colineares numa medida só, para lotes de contorno
   muito ruidoso (evita rótulos minúsculos espremidos).
