@@ -128,11 +128,29 @@ altura menor para caber — o mesmo mecanismo em ambos os casos:
   pavimento comporta o alvo dentro do CA disponível.
 - **Torre implantada**: mesmo campo (`alvoLaje`) passado como `alvo` para
   `torreImplantada()`, ver seção abaixo.
+- **Laje natural que sobra em relação ao alvo, na altura já escolhida**: a
+  seleção por `curva` acima só resolve quando ALGUMA altura naturalmente
+  encolhe até o alvo. Em lote comum onde a altura já bate no teto do
+  gabarito/CA (a curva nunca aperta o bastante), a torre natural sempre
+  ocupava o envelope INTEIRO — não tinha como encolher dentro dele. Bug
+  real: nesses lotes, subir a laje alvo não tinha efeito nenhum, porque
+  `best.laje` continuava o do envelope cheio (bem maior que o alvo).
+  Corrigido: depois de escolher `best` (por `cUser`/`alto`), se
+  `best.laje > alvoLaje×1.02`, chama `torreImplantada(..., hFixo=best.H)` —
+  a mesma função da torre implantada, mas com um parâmetro novo (`hFixo`)
+  que pula a própria busca de altura e ajusta o pavimento-tipo só naquela
+  altura já decidida, reaproveitando ancoragem/deformação. Substitui
+  `best.anel/laje/acTorre/acTotal` (mesma fórmula de CA capado por
+  `acMax-acBase` da torre implantada), preserva `best.H/nT`. Sinalizado por
+  `compactada` (distinto de `implantada`: mesmo mecanismo de encolhimento,
+  mas em lote comum, não por recuo inviabilizar a torre) — aparece no corte
+  como "(laje compacta)".
 - Testado com dados sintéticos de `curva` (lote grande com laje encolhendo
   por altura, lote pequeno onde nada cabe no alvo, mesmo lote grande com
-  alvo menor): confirma que o padrão troca de "maximizar altura, laje
-  resultante" para "mirar o alvo, altura resultante", sem regressão nos
-  lotes onde o alvo não cabe em nenhum pavimento.
+  alvo menor) e um cenário de `torreImplantada(..., hFixo=87.5)` num lote
+  simples 80×60 (laje natural bem maior que o alvo, mesmo no teto de
+  altura): confirma que a altura fica EXATAMENTE a fixada (não busca outra)
+  e a área bate exatamente com o alvo, respeitando o recuo em toda aresta.
 
 ## Torre implantada (lotes irregulares)
 
@@ -316,9 +334,18 @@ Botão `#btnPlantas` abre `#telaPlantas` com duas plantas SVG **geradas do
   "Unidades por pavimento" (`uniPav`) também foi removido — ficou órfão
   depois que `lajeDesejada` passou a vir direto de `#ovLajeAlvo` em m², não
   mais de `uniPav × m2Uni ÷ fator`. Ver seção "Laje alvo".
+- Concluído (5ª rodada, bug real visto pelo usuário depois da 4ª): a laje
+  alvo generalizada (4ª rodada) só funcionava quando ALGUMA altura da curva
+  naturalmente encolhia até o alvo — em lote comum já no teto do gabarito/CA,
+  a torre natural sempre ocupava o envelope inteiro (sem opção de encolher
+  dentro dele), então subir a laje alvo não tinha efeito nenhum quando a laje
+  resultante já era maior que o alvo. Corrigido reaproveitando
+  `torreImplantada()` com um parâmetro novo (`hFixo`) que ajusta o
+  pavimento-tipo na altura JÁ escolhida em vez de buscar altura — ver seção
+  "Laje alvo".
 - Em aberto (do lado do usuário): conferência pontual de ~17,5% de divergência de
   ZOT contra uma camada externa; conferência do visual final sobre o basemap CARTO
-  ao vivo; **validação em navegador real** da 2ª, 3ª e 4ª rodadas de correções (só
+  ao vivo; **validação em navegador real** da 2ª a 5ª rodadas de correções (só
   foi possível testar a geometria pura/lógica extraída nesta sessão — ver
   limitação de ambiente na seção de Testes).
 - Ideia futura: agrupar faces colineares numa medida só, para lotes de contorno

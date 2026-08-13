@@ -611,7 +611,7 @@ function pontoNoPoligono(p, anel){
    contorno legal (busca radial a partir do retangulo encontrado) em vez de
    insistir num formato reto. Sobe ate a maior altura em que a laje (do
    tamanho que couber) ainda cabe respeitando o recuo no topo. */
-function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular){
+function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular, hFixo){
   const anel = T.anel;
   const nv = anel.length-1;
   if(nv < 3) return null;
@@ -859,13 +859,23 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
   };
 
   /* sobe altura ate a maior em que a laje (do tamanho que couber) ainda
-     cabe respeitando o recuo no topo */
-  const dH=Math.max(pd, (hMax-Hbase)/8);
-  let melhor=null, melhorScore=0;
-  for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
-    const rLat = H > baseIsenta ? fLat*H : 0;
+     cabe respeitando o recuo no topo. hFixo pula a busca e ajusta so
+     naquela altura — usado quando a altura ja foi escolhida por outro
+     mecanismo (ex.: a torre natural encolhendo o proprio pavimento-tipo
+     para bater na laje alvo, na altura que o otimizador ja decidiu). */
+  let melhor=null;
+  if(hFixo != null){
+    const rLat = hFixo > baseIsenta ? fLat*hFixo : 0;
     const r = ajustar(rLat);
-    if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
+    if(r) melhor = {r:r, H:hFixo, rLat:rLat};
+  } else {
+    const dH=Math.max(pd, (hMax-Hbase)/8);
+    let melhorScore=0;
+    for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
+      const rLat = H > baseIsenta ? fLat*H : 0;
+      const r = ajustar(rLat);
+      if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
+    }
   }
   if(!melhor) return null;
 
@@ -1656,6 +1666,29 @@ function resolver(){
   if(!best) best = {nT:0,H:Hbase,laje:areaBase,anel:envB.anel,rDiv:0,
                     acTorre:0,acTotal:acBase,sat:false};
 
+  const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
+  /* Laje alvo MENOR que o envelope natural na altura ja escolhida: a torre
+     natural sempre ocupava o envelope INTEIRO — nao tinha como "encolher"
+     dentro dele, so a torre implantada sabia fazer isso, e so disparava em
+     lotes irregulares. Bug real: num lote comum, com a altura ja no teto do
+     gabarito/CA, a curva de alturas nunca aperta o bastante pra a laje
+     alvo virar o fator limitante — subir a laje alvo nao tinha EFEITO
+     nenhum, best.laje continuava o do envelope cheio (bem maior que o
+     alvo). Corrigido: sempre que a laje ESCOLHIDA sobra em relacao ao alvo,
+     encolhe o pavimento-tipo para o alvo NA MESMA altura ja decidida
+     (torreImplantada com hFixo=best.H, pulando a propria busca de altura),
+     reaproveitando a mesma ancoragem/deformacao da torre implantada. */
+  let compactada = false;
+  if(best.nT > 0 && best.laje > alvoLaje*1.02){
+    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular, best.H);
+    if(cf && cf.area > 20 && cf.area < best.laje){
+      const acTorreC = Math.min(best.nT*cf.area, Math.max(0, acMax-acBase));
+      best = {nT:best.nT, H:best.H, laje:cf.area, anel:cf.anel, rDiv:best.rDiv,
+              acTorre:acTorreC, acTotal:Math.min(acTorreC+acBase, acMax), sat:best.sat};
+      compactada = true;
+    }
+  }
+
   /* Torre inviavel: os recuos erodiram o poligono irregular ate sobrar
      laje ~0. Em vez de nao viabilizar, reparte o lote com uma torre
      implantada compacta (~600 m2, editavel) recuada da maior frente.
@@ -1669,11 +1702,12 @@ function resolver(){
      inutilizavel (bug real: a torre implantada e o botao "laje retangular"
      nao tinham efeito nenhum nesses lotes, porque nunca eram sequer
      tentados). Dispara tambem quando o proprio best.laje (o que de fato
-     aparece na planta) e pequeno, nao so quando NENHUM pavimento presta. */
+     aparece na planta) e pequeno, nao so quando NENHUM pavimento presta.
+     Pulado se ja compactamos acima (evita reprocessar/mudar de altura
+     quando a laje alvo em si e pequena, ex.: usuario pede <80 m2). */
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
-  const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
-  if((maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
+  if(!compactada && (maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
     const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
@@ -1734,7 +1768,7 @@ function resolver(){
           vagas:vagas,areaGaragem:areaGaragem,nSub:nSub,subNecess:subNecess,areaSubsolo:areaSubsolo,
           nBase:nBasePav,pdBase:pdBase,Hbase:Hbase,areaBase:areaBase,baseComputa:baseComputa,envB:envB,construida:construida,
           toEfetiva:toEfetiva,permExigida:permExigida,permMinima:permMinima,excedente:excedente,vc:vc,
-          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,hMax:hMax};
+          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,compactada:compactada,hMax:hMax};
 }
 
 /* =====================================================================
@@ -2530,7 +2564,7 @@ function svgCorte(s){
   const linhas=[];
   linhas.push('Altura atingida: '+fmt(Htot,1)+' m (de '+fmt(s.hMax||0,0)+' m)');
   if(nBase>0) linhas.push('Base isenta: '+nBase+' pav \u00d7 '+fmt(pdBase,2)+' m = '+fmt(Hbase,1)+' m'+(s.baseComputa?' (computa)':' (estacion.)'));
-  if(nT>0) linhas.push('Torre: '+nT+' pav \u00d7 '+fmt(pd,2)+' m'+(s.implantada?' (implantada)':''));
+  if(nT>0) linhas.push('Torre: '+nT+' pav \u00d7 '+fmt(pd,2)+' m'+(s.implantada?' (implantada)':(s.compactada?' (laje compacta)':'')));
   linhas.push('Recuo lateral: '+fmt(rDiv,1)+' m \u00b7 jardim: '+fmt(s.rjEfetivo,1)+' m');
   if(nSub>0) linhas.push('Subsolos: '+nSub+' \u00d7 ~'+hSub+' m');
   linhas.push('Laje do pavimento: '+fmt(s.lajeReal,0)+' m\u00b2 \u00b7 CA '+fmt(s.acTotal/ (s.areaCA||s.T.area) ,2));

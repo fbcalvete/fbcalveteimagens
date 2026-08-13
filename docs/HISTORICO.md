@@ -350,6 +350,56 @@ confirmando o trade-off área↔altura pedido desde a primeira rodada. A
 suíte de 6 cenários de `torreImplantada()` (itens 8-10) continua passando
 sem regressão.
 
+## 13. Laje alvo generalizada (item 12) ainda não encolhia em lote comum
+O usuário testou a expansão do item 12 num lote grande, quase todo o CA
+consumido (índice em 100%). Definiu "Laje alvo" = 410 m², mas a laje
+mostrada continuou 1.184 m² — bem maior. "Quando o empreendimento passa de
+600 m² de laje, adicionar uma metragem de laje alvo não reduz o tamanho da
+torre. Mas deveria."
+
+**Causa raiz**: o mecanismo do item 12 (`best = cUser || alto`) só resolve
+o alvo subindo/descendo pela CURVA DE ALTURAS — escolhe a maior altura cujo
+envelope natural, POR SI SÓ, já encolheu até (pelo menos) o alvo. Isso
+funciona quando a curva aperta o bastante antes do teto do gabarito. Mas
+nesse lote a altura já tinha batido no teto (87,5 de 90 m, CA praticamente
+esgotado) e o envelope, MESMO no pavimento mais alto, ainda tinha 1.184 m² —
+bem acima do alvo de 410. A torre natural nunca teve a opção de "encolher
+dentro" do envelope como a torre implantada sabe fazer (`ajustar`/`deformar`
+em `torreImplantada()`); ela sempre ocupa o envelope INTEIRO na altura
+escolhida. Como a altura já estava no teto (não tinha mais pra onde subir),
+e a laje natural nessa altura já era maior que qualquer alvo razoável, o
+mecanismo da 4ª rodada nunca tinha efeito nesse regime — subir o alvo não
+mudava nada, porque nunca era o alvo que travava a altura, era o teto do
+gabarito/CA.
+
+**Correção**: `torreImplantada()` ganhou um parâmetro novo, `hFixo` — quando
+passado, pula a própria busca de altura (o loop que varre `H` de `hMax` até
+`Hbase+pd`) e ajusta o pavimento-tipo (retângulo, e deforma se precisar)
+só naquela altura fixa. Em `resolver()`, depois de escolher `best` pelo
+mecanismo da 4ª rodada, se `best.laje` ainda sobra em relação ao
+`alvoLaje` (>2% de folga), chama `torreImplantada(..., hFixo=best.H)` para
+encolher o pavimento-tipo NA MESMA altura já decidida — reaproveitando toda
+a ancoragem (maior testada, esquina) e deformação já testadas para a torre
+implantada, sem duplicar lógica. `acTorre`/`acTotal` são recalculados com a
+mesma fórmula de CA capado por `nT × área` da torre implantada, pra não
+reintroduzir o bug de área divergente do item 8. Sinalizado por um flag novo
+(`compactada`, distinto de `implantada` — mesmo mecanismo de encolhimento,
+mas em lote comum, não por recuo inviabilizar a torre natural), com rótulo
+"(laje compacta)" no corte.
+
+**Cuidado se mexer de novo**: o novo passo de compactação roda ANTES do
+gatilho da torre implantada (item 11) e, se compactar com sucesso, pula
+esse gatilho (`!compactada &&` na condição) — evita que um alvo bem pequeno
+(<80 m²) dispare a busca de altura da implantada de novo por cima do
+resultado já compactado, potencialmente mudando a altura escolhida.
+
+**Teste**: novo cenário sintético (lote retangular simples 80×60, laje
+natural grande mesmo na altura máxima) chamando `torreImplantada(...,
+hFixo=87.5)` diretamente — confirma que a altura devolvida é EXATAMENTE a
+fixada (não busca outra), a área bate exatamente com o alvo (410,00 m²
+reportado == shoelace), e toda aresta do retângulo resultante respeita o
+recuo. Os 6 cenários anteriores (itens 8-10) continuam passando.
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
@@ -373,13 +423,14 @@ sem regressão.
 - Conferência pontual (do seu lado) de ~17,5% de divergência de ZOT contra uma
   camada externa.
 - Conferência do visual final sobre o basemap CARTO ao vivo.
-- Validação em navegador real da rodada de correções dos itens 8-12 (recuo na
+- Validação em navegador real da rodada de correções dos itens 8-13 (recuo na
   planta, laje física, torre implantada reancorada, laje deformada sem cortar
   o recuo, botão laje retangular, gatilho da implantada, halo de contraste no
-  tracejado, laje alvo valendo pra qualquer torre) — só testada com geometria
-  pura/lógica extraída nesta sessão, por causa da restrição de proxy/Chromium
-  acima. A mudança de escopo do item 12 merece atenção especial: confirmar que
-  o comportamento padrão (mirar a laje alvo, não mais maximizar altura) é
+  tracejado, laje alvo valendo pra qualquer torre, laje alvo encolhendo em
+  lote comum já no teto do gabarito) — só testada com geometria pura/lógica
+  extraída nesta sessão, por causa da restrição de proxy/Chromium acima. A
+  mudança de escopo do item 12 merece atenção especial: confirmar que o
+  comportamento padrão (mirar a laje alvo, não mais maximizar altura) é
   mesmo o que você quer em lotes onde não reparou ainda.
 - Melhoria futura: agrupar faces colineares numa medida só na planta de situação,
   para lotes de contorno muito ruidoso.
