@@ -86,9 +86,22 @@ Regras-chave da LUOS embutidas:
   ~4,17 m ocupando o lote todo até a divisa. **`ovBase = 0` significa 0** (sem
   base, torre do chão) — o fallback 12,5 só vale quando o campo está vazio.
 - **Recuo lateral**: `fLat = usar15 ? 0.15 : R.lat`, onde `usar15` é verdadeiro
-  quando a testada ≤ 20 m (`R.d15`). Ou seja: **18% da altura, ou 15% se a testada
-  < 20 m** (Emenda 88 / Jessé Sangalli). Aplica-se acima da base isenta:
-  `rDiv = fLat * H`.
+  quando a **largura entre divisas laterais** (`T.largura`, o corpo do lote —
+  não a testada/frente) é ≤ `R.d15` (15 ou 20 m conforme a ZOT). Ou seja:
+  **18% da altura, ou 15% se a largura do corpo do lote ≤ o limite da ZOT**
+  (Emenda 88 / Jessé Sangalli). Aplica-se acima da base isenta: `rDiv = fLat * H`.
+  **Decisão registrada no código** (comentário em `resolver()`): o Anexo II
+  fala em distância máxima entre divisas laterais paralelas, que é a largura
+  do corpo do lote, não o comprimento da testada — confirmado com o usuário
+  quando ele achou que a regra usava testada; o cálculo já estava certo.
+  **Cuidado de UX real**: o campo editável "Recuos laterais (%)" na tabela
+  esquerda (`#ovLat`) só mostra o valor BASE da ZOT (18%) — não muda sozinho
+  quando `usar15` dispara, e nesse caso o valor do campo é ignorado (o
+  cálculo usa 15% fixo, não o que está no campo). Por isso há uma linha
+  separada e sempre visível, "Recuo lateral aplicado" (em `mostrarDerivados()`,
+  logo abaixo do botão "Restaurar valores do Anexo II"), que mostra o
+  percentual EFETIVO (`s.fLat*100`) e, quando `s.usar15` é verdadeiro, o
+  motivo — para não parecer que a tabela "travou" em 18%.
 - **Uso da base** = estacionamento por padrão (`#usoBase = 'gar'`, não computa CA);
   `'com'` = uso computável.
 - **Subsolo** padrão 0 (`#nSub`).

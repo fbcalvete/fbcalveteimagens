@@ -400,6 +400,32 @@ fixada (não busca outra), a área bate exatamente com o alvo (410,00 m²
 reportado == shoelace), e toda aresta do retângulo resultante respeita o
 recuo. Os 6 cenários anteriores (itens 8-10) continuam passando.
 
+## 14. Recuo de 15% (testada estreita) — cálculo certo, tabela enganosa
+O usuário perguntou se a regra do Plano Diretor (testada < 20 m → recuo
+lateral de 15% em vez de 18%) já estava implementada. Estava — mas com um
+detalhe: o critério no código é a **largura entre divisas laterais** (o
+corpo do lote), não a testada, com uma justificativa já registrada
+(`resolver()`, comentário citando o Anexo II: a lei fala em distância entre
+divisas paralelas, não em comprimento de testada). Perguntei ao usuário se
+quereria trocar o critério; ele confirmou que **o cálculo está certo**.
+
+Mas apontou um problema real diferente: o campo editável "Recuos laterais
+(%)" na tabela da esquerda (`#ovLat`) continua mostrando 18% mesmo quando o
+lote dispara os 15% — porque esse campo só é preenchido uma vez, com o valor
+BASE da ZOT, quando o lote/ZOT muda (`preencherRegime()`), e nunca mais é
+tocado durante os recálculos seguintes. O CÁLCULO já ignorava esse campo
+corretamente quando `usar15` era verdadeiro (usa 0.15 fixo, não o que está
+no input), mas a TABELA não deixava isso visível — parecia que o programa
+"esquecia" de aplicar a regra.
+
+**Correção**: sem mexer no campo editável em si (evita sobrescrever uma
+edição manual do usuário sem aviso), adicionei uma linha sempre visível,
+"Recuo lateral aplicado", logo abaixo do botão "Restaurar valores do Anexo
+II" (mesma área da tabela, em `mostrarDerivados()`) — mostra o percentual
+REALMENTE usado (`s.fLat*100`) e, quando os 15% estão em vigor, o motivo
+("largura ≤ X m"). `resolver()` passou a expor `fLat` e `usar15` no objeto
+de retorno (antes ficavam só de uso interno).
+
 ---
 
 ## Armadilhas recorrentes (não repetir)

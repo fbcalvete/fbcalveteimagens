@@ -1768,7 +1768,7 @@ function resolver(){
           vagas:vagas,areaGaragem:areaGaragem,nSub:nSub,subNecess:subNecess,areaSubsolo:areaSubsolo,
           nBase:nBasePav,pdBase:pdBase,Hbase:Hbase,areaBase:areaBase,baseComputa:baseComputa,envB:envB,construida:construida,
           toEfetiva:toEfetiva,permExigida:permExigida,permMinima:permMinima,excedente:excedente,vc:vc,
-          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,compactada:compactada,hMax:hMax};
+          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,compactada:compactada,hMax:hMax,fLat:fLat,usar15:usar15};
 }
 
 /* =====================================================================
@@ -2271,6 +2271,12 @@ function mostrarDerivados(s){
   const caObtido = s.areaCA>0 ? s.acTotal/s.areaCA : 0;
   const linha = (rot,val) => '<div class="drow"><span>'+rot+'</span><b>'+val+'</b></div>';
   el.innerHTML =
+    /* recuo lateral EFETIVO: o campo "Recuos laterais (%)" acima so mostra
+       o valor base da ZOT (18% em geral) e nao muda sozinho quando a
+       largura entre divisas dispara os 15% (Emenda 88/Jesse Sangalli) —
+       o calculo ja usava 15% corretamente, mas a tabela parecia travada em
+       18%, sem indicar que o valor editavel estava sendo ignorado. */
+    linha('Recuo lateral aplicado', fmt(s.fLat*100,0)+'%'+(s.usar15?' (largura ≤ '+fmt(s.R.d15,0)+' m)':'')) +
     linha('CA obtido', fmt(caObtido,2)) +
     linha('Altura atingida', fmt(s.best.H,1)+' m') +
     linha('Área da laje', fmt(s.lajeReal,0)+' m²') +
