@@ -1933,17 +1933,6 @@ function distPtSeg(px,py, ax,ay, bx,by){
   const cx=ax+t*dx, cy=ay+t*dy;
   return Math.hypot(px-cx, py-cy);
 }
-function segSegDist(p,q, r,s){
-  /* 0 se os segmentos se cruzam; senao a menor das 4 distancias ponto-segmento */
-  const d=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
-  const d1=d(r,s,p), d2=d(r,s,q), d3=d(p,q,r), d4=d(p,q,s);
-  if(((d1>0)!==(d2>0)) && ((d3>0)!==(d4>0))) return 0;
-  return Math.min(
-    distPtSeg(p[0],p[1], r[0],r[1], s[0],s[1]),
-    distPtSeg(q[0],q[1], r[0],r[1], s[0],s[1]),
-    distPtSeg(r[0],r[1], p[0],p[1], q[0],q[1]),
-    distPtSeg(s[0],s[1], p[0],p[1], q[0],q[1]));
-}
 const TIPO_LOG = {R:'Rua', AV:'Avenida', TV:'Travessa', TR:'Travessa', BC:'Beco',
                   ES:'Estrada', PC:'Praça', PR:'Praça', LG:'Largo', RD:'Rodovia',
                   AC:'Acesso', VD:'Viaduto', LD:'Ladeira'};
@@ -2101,7 +2090,7 @@ function desenhar(s){
 
   if(s.R.h){
     const H = s.R.h;
-    const rd = H > (s.baseIsenta||0) ? ((s.R.d15 && (s.T.largura||s.testada) <= s.R.d15) ? .15 : s.R.lat)*H : 0;
+    const rd = H > (s.baseIsenta||0) ? s.fLat*H : 0;   /* reusa o fLat ja resolvido (evita re-derivar a regra 15%/18% aqui) */
     const rec = T.arestas.map(e => ({a:e.a, b:e.b, r: e.tipo === 'frente' ? s.rjEfetivo : rd}));
     const env = recortar(T.anel, rec);
     if(env.anel.length > 3){
