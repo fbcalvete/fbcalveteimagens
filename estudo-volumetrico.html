@@ -730,6 +730,57 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     }
     return null;
   };
+  /* FALLBACK DE POSICAO: quando a ancora na maior testada esta bloqueada
+     (recuos de varias frentes a estrangulam, ou o poligono se estreita
+     ali), ajustar() devolve null e a torre nao subia — mesmo havendo lugar
+     em OUTRO canto do lote (bug real: lote grande, 5 lotes remembrados, 8
+     frentes, "nao sobe torre"). A versao antiga varria posicoes numa grade;
+     a reescrita ancorada na testada perdeu esse plano B. Aqui ele volta: so
+     e chamado quando ajustar() falha, entao lote comum nao paga nada. Varre
+     centros numa grade, encaixa o maior retangulo que couber (mesma
+     orientacao dx/dy/nx/ny) e guarda o de MAIOR area. Nao encosta no recuo
+     de jardim como a ancora — e um ponto de partida a refinar, coerente com
+     o texto da propria torre implantada. */
+  /* verifica o retangulo INTEIRO, nao so os cantos+meios: perto de um
+     vertice reentrante do lote (junção de um bra o estreito com um largo) a
+     ARESTA do retangulo pode curvar para dentro da zona de recuo entre dois
+     pontos amostrados, mesmo com cantos e meios legais — o mesmo problema
+     "vertice legal, aresta viola" da laje deformada. O fallback varre
+     posicoes perto justamente desses cantos, entao aqui a amostragem densa
+     por aresta e obrigatoria (o ajustar() ancorado nao pega esses spots e
+     por isso nunca precisou disso). */
+  const retanguloLegal=(c, rLat)=>{
+    if(!pontoOk([(c[0][0]+c[2][0])/2,(c[0][1]+c[2][1])/2], rLat)) return false;  /* centro */
+    for(let i=0;i<4;i++){
+      const a=c[i], b=c[(i+1)%4], len=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      const passos=Math.max(2, Math.ceil(len/1.0));   /* ~1 ponto por metro */
+      for(let k=0;k<=passos;k++){ const t=k/passos;
+        if(!pontoOk([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t], rLat)) return false; }
+    }
+    return true;
+  };
+  const fitEm=(cx,cy,rLat)=>{
+    let W=Math.sqrt(alvo), D=alvo/W;
+    for(let it=0; it<26; it++){
+      const c=ret(cx,cy,W,D);
+      if(retanguloLegal(c, rLat)) return {anel:c.concat([c[0]]), area:W*D, W:W, D:D, cx:cx, cy:cy};
+      W*=0.96; D*=0.96;
+      if(W*D<40) return null;
+    }
+    return null;
+  };
+  const ajustarGrade=(rLat)=>{
+    const area0=(bb[2]-bb[0])*(bb[3]-bb[1]);
+    const step=Math.max(2.5, Math.sqrt(area0)/14);
+    let melhorG=null;
+    for(let gx=bb[0]+step*0.5; gx<=bb[2]; gx+=step)
+      for(let gy=bb[1]+step*0.5; gy<=bb[3]; gy+=step){
+        if(!pontoNoPoligono([gx,gy], anel)) continue;
+        const r=fitEm(gx,gy,rLat);
+        if(r && (!melhorG || r.area>melhorG.area)) melhorG=r;
+      }
+    return melhorG;
+  };
   /* quando o retangulo nao fecha o alvo, deforma a laje: busca radial do
      maior contorno legal a partir do centro do melhor retangulo, depois
      escala de volta ao alvo se sobrar espaco — segue o desenho real dos
@@ -866,14 +917,14 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
   let melhor=null;
   if(hFixo != null){
     const rLat = hFixo > baseIsenta ? fLat*hFixo : 0;
-    const r = ajustar(rLat);
+    const r = ajustar(rLat) || ajustarGrade(rLat);   /* fallback de posicao se a ancora falhar */
     if(r) melhor = {r:r, H:hFixo, rLat:rLat};
   } else {
     const dH=Math.max(pd, (hMax-Hbase)/8);
     let melhorScore=0;
     for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
       const rLat = H > baseIsenta ? fLat*H : 0;
-      const r = ajustar(rLat);
+      const r = ajustar(rLat) || ajustarGrade(rLat);   /* fallback de posicao se a ancora falhar */
       if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
     }
   }

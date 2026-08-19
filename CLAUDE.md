@@ -197,6 +197,22 @@ laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
   nesse caso ela fica **a `rj` de distância de AMBAS as frentes**, não só da de
   referência (bug real: a primeira versão só afastava da frente de referência e
   colava a laje em cima da outra).
+- **Fallback de posição (`ajustarGrade`)**: a âncora acima resolve a maioria dos
+  lotes, mas quando a maior testada dá para um **braço estreito** (recuos de
+  várias frentes o estrangulam), `ajustar()` não fecha ≥40 m² e devolve null —
+  e a torre não subia, MESMO havendo lugar em outro canto do lote (bug real:
+  lote grande, 5 lotes remembrados, 8 frentes, "não sobe torre"). A versão
+  bem antiga varria posições numa grade; a reescrita ancorada perdeu esse
+  plano B. Restaurado: `ajustar(rLat) || ajustarGrade(rLat)` — o grid só roda
+  quando a âncora falha (lote comum não paga nada), varre centros numa grade
+  e pega o maior retângulo que couber na mesma orientação. **Cuidado**: o
+  encaixe do grid (`fitEm`) valida o retângulo por AMOSTRAGEM DENSA de cada
+  aresta (`retanguloLegal`, ~1 ponto/m), não só cantos+meios — porque o grid
+  explora posições perto de vértices reentrantes (onde o braço encontra o
+  corpo), e ali a aresta reta do retângulo pode cortar a zona de recuo entre
+  dois pontos amostrados (mesmo "vértice legal, aresta viola" da deformação).
+  O `ajustar()` ancorado nunca pega esses spots, por isso só o `fitEm` precisa
+  da checagem densa.
 - **Formato**: começa quadrada no alvo, encostada no recuo de jardim. Se o recuo
   lateral não deixa fechar o alvo num retângulo, encolhe (mantendo quadrado/
   proporção) até caber. Se ainda faltar área para o alvo, **deforma**.
@@ -245,6 +261,10 @@ laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
   com reentrância (o cenário que pegou os dois bugs acima), e o mesmo lote em L
   com `soRetangular=true`. Os 6 passam validando **arestas inteiras** (não só
   vértices) contra o recuo, com área reportada == área shoelace do polígono.
+  Um 7º cenário (`test_fallback_permanente.js`) cobre o fallback de posição:
+  lote em "T" cuja maior testada dá para um cabo estreito de 8 m (âncora
+  bloqueada) e área livre na cabeça larga — confirma que a torre agora sobe
+  (cai na cabeça, não no cabo) e respeita o recuo em toda aresta.
 
 ## 3D (Three.js r128, `desenhar(s)`)
 

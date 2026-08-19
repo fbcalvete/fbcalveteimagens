@@ -426,6 +426,45 @@ REALMENTE usado (`s.fLat*100`) e, quando os 15% estão em vigor, o motivo
 ("largura ≤ X m"). `resolver()` passou a expor `fLat` e `usar15` no objeto
 de retorno (antes ficavam só de uso interno).
 
+## 15. "Não sobe torre" num lote grande — fallback de posição na implantada
+O usuário mostrou um lote real (5 lotes remembrados, 4.354 m², **8 frentes
+detectadas**, formato de seta) onde a torre não subia: laje 0, índice 0,
+trava `recuo`, só o embasamento. Diagnóstico: o recorte por semiplanos
+colapsa nesse polígono irregular com recuo de jardim incidindo em 8 frentes
+(o slivering de sempre) → laje natural ~0. Isso deveria acionar a **torre
+implantada**, mas ela também devolvia null.
+
+**Causa raiz** (achada lendo o código, não reproduzindo o lote — o ArcGIS/
+navegador está bloqueado neste ambiente): `torreImplantada()` ancora o
+retângulo compacto numa **única posição** — o centro da maior testada — e
+`ajustar()` só encolhe ali; se aquele ponto não fecha ≥40 m² (a maior
+testada dando para um braço estreito, estrangulado pelos recuos de várias
+frentes), devolve null e desiste, **mesmo havendo lugar em outro canto do
+lote**. A versão bem antiga (item 5b) varria posições numa grade; a
+reescrita ancorada na maior testada (para cair no lugar certo nos lotes
+comuns) perdeu esse plano B.
+
+**Correção**: `ajustar(rLat) || ajustarGrade(rLat)`. `ajustarGrade` é um
+fallback que só roda quando a âncora falha (lote comum não paga o custo):
+varre centros numa grade dentro do bbox, encaixa o maior retângulo que
+couber (mesma orientação) e pega o de maior área. Sinalizei um cuidado que
+custou um segundo passo: o encaixe do grid (`fitEm`) precisou validar o
+retângulo por **amostragem densa de cada aresta** (`retanguloLegal`, ~1
+ponto/m), não só cantos+meios — a primeira versão do `fitEm` copiou a
+checagem esparsa do `ajustar` e, como o grid explora posições perto de
+vértices reentrantes (junção de braço estreito com corpo largo), a aresta
+reta do retângulo cortava a zona de recuo entre dois pontos amostrados
+(invasão de 0,44 m num teste). O `ajustar()` ancorado nunca cai nesses
+spots, por isso só o grid precisou da checagem densa.
+
+**Teste**: novo cenário sintético (`test_fallback_permanente.js`) — lote em
+"T" cuja maior testada dá para um cabo de 8 m (âncora bloqueada) e área livre
+na cabeça larga. Confirma: a torre agora sobe, cai na cabeça (centro y na
+metade larga, não no cabo), respeita o recuo em toda aresta (0,000 m de
+invasão), e área == shoelace. Os 6 cenários anteriores da torre implantada
+continuam passando. **Falta a validação no lote real do usuário** (só ele
+consegue abrir o navegador com o ArcGIS ao vivo).
+
 ---
 
 ## Armadilhas recorrentes (não repetir)
