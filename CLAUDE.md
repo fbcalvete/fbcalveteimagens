@@ -1,8 +1,22 @@
 # Estudo Volumétrico — LUOS Porto Alegre (LC 1.076/2026)
 
 Ferramenta web de estudo de viabilidade volumétrica a partir de terrenos de
-Porto Alegre. Arquivo único, autossuficiente: **`estudo-volumetrico.html`**
-(~800 KB). Todo o trabalho é em português. Contexto: incorporadora Melnick.
+Porto Alegre. **Dois arquivos que andam juntos, na mesma pasta:**
+`estudo-volumetrico.html` (~150 KB, todo o app) e **`zonas-grade.js`** (~700 KB,
+só o PNG base64 da grade de ZOTs, como data URI). Até uma rodada recente era um
+HTML único de ~855 KB; a pedido do usuário o PNG foi extraído para o sidecar
+para aliviar o HTML (fica ~5,7× menor e muito mais rápido de abrir/editar). Todo
+o trabalho é em português. Contexto: incorporadora Melnick.
+
+**Por que o sidecar é `.js` (data URI) e NÃO um `.png` externo:** `carregarGrade()`
+faz `getImageData` no canvas para ler o índice de ZOT por pixel. Um `.png`
+carregado por caminho relativo deixa o canvas *tainted* sob `file://` (origem
+opaca) e o `getImageData` lança SecurityError — a detecção de ZOT quebraria para
+quem abre o HTML direto. Como data URI dentro de um `<script src>`, a origem é a
+mesma e o `getImageData` funciona igual em `file://` e `http://`. O `<script
+src="zonas-grade.js">` carrega antes do bloco do app (define o global
+`ZONAS_IDX`). Se algum dia precisar servir por http de verdade, aí um `.png`
+externo volta a ser opção.
 
 > Este arquivo é lido pelo Claude Code no início de cada sessão. Ele carrega o
 > conhecimento acumulado do projeto — leia antes de mexer em qualquer cálculo.
@@ -20,15 +34,20 @@ Porto Alegre. Arquivo único, autossuficiente: **`estudo-volumetrico.html`**
 Historicamente havia duas cópias do HTML (uma de trabalho e a entregável) e um
 `cp` errado reintroduzia código morto. **Com git isso deixa de ser problema:**
 trabalhe em um arquivo só, versione, e confie no diff. Se mantiver cópias, sempre
-confirme com `md5sum` que estão idênticas antes de terminar.
+confirme com `md5sum` que estão idênticas antes de terminar. **Agora que há o
+sidecar `zonas-grade.js`, os dois arquivos precisam ser entregues/copiados
+juntos** — o HTML sem o `zonas-grade.js` na mesma pasta abre, mas sem a grade de
+ZOTs (mapa carrega, detecção de zona fica cega).
 
 ## Como validar a sintaxe do JS embutido
 
-Há dois blocos `<script>`: o primeiro tem constantes + um PNG base64 da grade de
-ZOTs; o último tem o app. Para checar a sintaxe:
+Há dois blocos `<script>` inline no HTML: o primeiro tem constantes (ZONAS_ORDEM,
+ZONAS_W/H, etc.), o último tem o app. O PNG da grade agora vive no sidecar
+`zonas-grade.js` (não mais inline). Para checar a sintaxe:
 ```
 python3 -c "import re;h=open('estudo-volumetrico.html').read();open('app.js','w').write(re.findall(r'<script>(.*?)</script>',h,re.S)[-1])"
 node --check app.js
+node --check zonas-grade.js
 ```
 
 ## Testes (Puppeteer)
