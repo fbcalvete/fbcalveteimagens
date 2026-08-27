@@ -216,9 +216,25 @@ laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
 - **Formato**: começa quadrada no alvo, encostada no recuo de jardim. Se o recuo
   lateral não deixa fechar o alvo num retângulo, encolhe (mantendo quadrado/
   proporção) até caber. Se ainda faltar área para o alvo, **deforma**.
-  Botão **`#tgRetangular`** (barra de cima da massa 3D, "Laje retangular") força
-  a laje a ficar sempre no maior retângulo que couber, nunca deformando — passa
-  `soRetangular=true` para `torreImplantada()`, que pula a deformação inteira.
+  Botões da barra de cima da massa 3D:
+  - **`#tgRetangular`** ("Laje retangular"): força a laje a ser um retângulo (o
+    maior que couber respeitando os recuos), em vez de acompanhar o contorno do
+    lote ou deformar — passa `soRetangular=true` para `torreImplantada()`, que
+    pula a deformação. **Vale para QUALQUER torre** (natural, compactada,
+    implantada), não só a implantada: o gatilho da compactação
+    (`forcarRet = soRetangular || alinharFrente`) dispara a retangularização na
+    torre natural viável (`best.laje>=80`) na altura já escolhida, via
+    `torreImplantada(..., hFixo=best.H)`. Antes só disparava quando a laje
+    natural sobrava em relação ao alvo (`best.laje > alvo*1.02`) — por isso o
+    botão "não funcionava" em lote onde a laje já era <= alvo (bug real).
+  - **`#tgAlinhar`** ("Alinhar frente"): orienta a laje (retangular) pela MAIOR
+    TESTADA ÚNICA — a fachada fica paralela à maior frente para logradouro. Passa
+    `alinharTestada=true` para `torreImplantada()`, que troca a orientação padrão
+    (maior GRUPO contíguo de frentes + esquina) pela maior ARESTA de frente única,
+    ancorando no meio dela. Difere do "Laje retangular" só quando o maior grupo
+    tem orientação diferente da maior aresta única (testado sintético: grupo
+    diagonal 122° vs testada base 0°). Implica retângulo (uma "frente" só existe
+    num retângulo).
 - **Deformação — cuidado, já teve dois bugs reais de recuo sendo violado**:
   1. Busca radial pura (raio legal por ângulo via busca binária a partir do
      centro do retângulo) só garante que os **vértices** respeitam o recuo — a

@@ -332,7 +332,8 @@ table.q tr.em td{color:var(--paper)} table.q tr.em td:last-child{color:var(--bp)
       <button id="tbMassa" class="on">Massa 3D</button>
       <button id="btnPlantas">Ver Plantas</button>
       <span class="spacer"></span>
-      <button id="tgRetangular" title="Força a laje da torre implantada a ficar sempre num retângulo (o maior que couber respeitando os recuos), em vez de deformar para tentar chegar na área-alvo.">Laje retangular</button>
+      <button id="tgRetangular" title="Força a laje da torre a ser um retângulo (o maior que couber respeitando os recuos), em vez de acompanhar o contorno do lote ou deformar.">Laje retangular</button>
+      <button id="tgAlinhar" title="Alinha a frente do prédio com a maior testada do terreno: a laje da torre vira um retângulo com a fachada paralela à maior frente para logradouro.">Alinhar frente</button>
       <button id="tgEnv" class="on">Envelope máximo</button>
     </div>
     <div class="vpwrap">
@@ -611,7 +612,7 @@ function pontoNoPoligono(p, anel){
    contorno legal (busca radial a partir do retangulo encontrado) em vez de
    insistir num formato reto. Sobe ate a maior altura em que a laje (do
    tamanho que couber) ainda cabe respeitando o recuo no topo. */
-function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular, hFixo){
+function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular, hFixo, alinharTestada){
   const anel = T.anel;
   const nv = anel.length-1;
   if(nv < 3) return null;
@@ -666,7 +667,21 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     if(ang>maiorAng){ maiorAng=ang; idxEsquina=k; }
   }
   let dirRef, ancora, esquina=false;
-  if(idxEsquina>=0 && maiorAng>ANG_ESQUINA){
+  /* ALINHAR FRENTE: orienta a laje pela MAIOR TESTADA UNICA (a maior aresta
+     de frente), nao pelo maior grupo contiguo + logica de esquina. Assim a
+     frente do predio fica paralela a maior testada do terreno. Ancora no
+     meio dessa aresta; sem tratamento de esquina (esquina=false). */
+  if(alinharTestada){
+    let maiorF=null, maiorL=0;
+    for(const e of arestasAnel) if(e.tipo==='frente'){
+      const L=Math.hypot(e.b[0]-e.a[0], e.b[1]-e.a[1]); if(L>maiorL){ maiorL=L; maiorF=e; } }
+    if(maiorF){
+      dirRef=[maiorF.b[0]-maiorF.a[0], maiorF.b[1]-maiorF.a[1]];
+      ancora=[(maiorF.a[0]+maiorF.b[0])/2, (maiorF.a[1]+maiorF.b[1])/2];
+    }
+  }
+  if(dirRef){ /* ja definido pelo alinhar-frente acima */ }
+  else if(idxEsquina>=0 && maiorAng>ANG_ESQUINA){
     esquina = true;
     const ladoA=grupo.slice(0,idxEsquina+1), ladoB=grupo.slice(idxEsquina+1);
     /* o vertice da esquina fica numa PONTA da laje (nao no meio) — a laje
@@ -1723,6 +1738,7 @@ function resolver(){
                     acTorre:0,acTotal:acBase,sat:false};
 
   const soRetangular = $('tgRetangular') && $('tgRetangular').classList.contains('on');
+  const alinharFrente = $('tgAlinhar') && $('tgAlinhar').classList.contains('on');
   /* Laje alvo MENOR que o envelope natural na altura ja escolhida: a torre
      natural sempre ocupava o envelope INTEIRO — nao tinha como "encolher"
      dentro dele, so a torre implantada sabia fazer isso, e so disparava em
@@ -1735,9 +1751,18 @@ function resolver(){
      (torreImplantada com hFixo=best.H, pulando a propria busca de altura),
      reaproveitando a mesma ancoragem/deformacao da torre implantada. */
   let compactada = false;
-  if(best.nT > 0 && best.laje > alvoLaje*1.02){
-    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular, best.H);
-    if(cf && cf.area > 20 && cf.area < best.laje){
+  /* Retangulariza/compacta a torre NATURAL viavel (laje>=80; o fiapo fica
+     para o bloco da torre implantada abaixo) na MESMA altura ja escolhida,
+     quando: (a) o usuario pediu "Laje retangular" ou "Alinhar frente" — force
+     um retangulo mesmo sem sobrar area; ou (b) a laje natural sobra em relacao
+     ao alvo — encolhe pro alvo. Antes so o caso (b) disparava, entao os botoes
+     nao faziam nada quando a laje natural ja era <= alvo (bug: "Laje retangular
+     nao funciona"). soRetangular liga o modo retangulo puro (sem deformar);
+     alinharFrente forca a orientacao pela maior testada unica. */
+  const forcarRet = soRetangular || alinharFrente;
+  if(best.nT > 0 && best.laje >= 80 && (forcarRet || best.laje > alvoLaje*1.02)){
+    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, best.H, alinharFrente);
+    if(cf && cf.area > 20 && cf.area <= best.laje + 1){
       const acTorreC = Math.min(best.nT*cf.area, Math.max(0, acMax-acBase));
       best = {nT:best.nT, H:best.H, laje:cf.area, anel:cf.anel, rDiv:best.rDiv,
               acTorre:acTorreC, acTotal:Math.min(acTorreC+acBase, acMax), sat:best.sat};
@@ -1764,7 +1789,7 @@ function resolver(){
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
   if(!compactada && (maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
-    const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, soRetangular);
+    const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, (soRetangular||alinharFrente), undefined, alinharFrente);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
       const nCA = acMax > acBase ? Math.floor((acMax-acBase)/ti.area) : 0;
@@ -2299,10 +2324,16 @@ $('tgEnv').onclick = function(){
   if(envG) envG.visible = mostrarEnv;
   this.classList.toggle('on', mostrarEnv);
 };
-/* forca a laje da torre implantada a ficar sempre retangular (maior que
-   couber respeitando os recuos), em vez de deformar para tentar chegar na
-   area-alvo — resolver() le esse estado via classList. */
+/* forca a laje da torre a ser um retangulo (maior que couber respeitando os
+   recuos), em vez de acompanhar o contorno do lote/deformar — resolver() le
+   esse estado via classList. */
 $('tgRetangular').onclick = function(){
+  this.classList.toggle('on');
+  calcular();
+};
+/* alinha a frente do predio com a maior testada: retangulo com a fachada
+   paralela a maior frente para logradouro. */
+$('tgAlinhar').onclick = function(){
   this.classList.toggle('on');
   calcular();
 };

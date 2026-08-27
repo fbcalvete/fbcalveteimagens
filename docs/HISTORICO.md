@@ -492,6 +492,35 @@ bloqueado neste ambiente). A suíte de geometria (7) segue passando.
 
 ---
 
+## 17. "Laje retangular" não funcionava + novo botão "Alinhar frente"
+**Laje retangular sem efeito.** A retangularização/compactação da torre só
+disparava quando a laje natural sobrava em relação ao alvo (`best.laje >
+alvo*1.02`). Em lote onde a laje natural já era <= alvo (lote pequeno ou
+recuo-limitado), o botão não tinha nada para atuar — a torre continuava
+acompanhando o contorno do lote. Corrigido: `forcarRet = soRetangular ||
+alinharFrente` também dispara a retangularização na torre natural viável
+(`best.laje >= 80`, para não preemptar o caminho da torre implantada nos
+fiapos) na altura já escolhida, via `torreImplantada(..., hFixo=best.H)`. Agora
+o botão vira a laje num retângulo em qualquer lote.
+
+**Novo botão "Alinhar frente" (`#tgAlinhar`).** Orienta a laje retangular pela
+MAIOR TESTADA ÚNICA (a maior aresta de frente), em vez da orientação padrão da
+torreImplantada (maior GRUPO contíguo de frentes + lógica de esquina). Assim a
+fachada fica paralela à maior frente para logradouro. Implementado com um
+parâmetro novo em `torreImplantada` (`alinharTestada`): quando ligado, ignora o
+grupo/esquina e usa a maior aresta de frente única (direção + ponto médio como
+âncora). Implica retângulo (uma "frente" só existe num retângulo).
+
+**Teste**: dois cenários sintéticos novos. (1) lote onde o maior grupo de
+frentes é diagonal (~122°) e a maior testada única é a base horizontal (0°):
+confirma que "Laje retangular" orienta pela diagonal do grupo e "Alinhar frente"
+pela base — resultados distintos, ambos retângulos, ambos respeitando o recuo em
+toda aresta. (2) lote onde coincidem: ambos dão o mesmo retângulo. Os 7 cenários
+anteriores da torre implantada + o do fallback de posição seguem passando.
+Validação visual no navegador pendente do usuário (ambiente sem ArcGIS).
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia
