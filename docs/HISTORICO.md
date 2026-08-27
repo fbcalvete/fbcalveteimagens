@@ -548,6 +548,40 @@ toda aresta. Os 7 cenários core + fallback + alinhar-frente seguem passando.
 
 ---
 
+## 19. Campo "Laje alvo" travado + implantada ignorando o alvo na altura
+Mesmo conjunto de terrenos do item 18. Dois problemas ligados.
+
+**Campo "Laje alvo" desabilitado ("não dá pra clicar") com mensagem errada
+"os recuos não deixam laje viável".** O limite/enable do campo
+(`atualizarLimiteLaje`) usava `maxLajeRecuos = maxLajeNat` (a maior laje da
+torre NATURAL). Em lote irregular a natural colapsa (~0), então o campo
+desabilitava — mesmo havendo uma torre implantada de 553 m² na tela. Corrigido
+computando `maxLajeViavel`: em lote comum é `maxLajeNat`; em lote irregular é a
+maior laje que a torre IMPLANTADA consegue, medida na altura mais BAIXA
+(Hbase+pd, menos recuo → maior laje), via `torreImplantada(T, area, ...,
+hFixo=Hbase+pd)`. O campo passa a habilitar até esse teto (ex.: ~1310 m² num
+lote onde antes travava em 0).
+
+**Aumentar a laje alvo não deixava a torre mais baixa/larga (não chegava ao
+envelope máximo).** A seleção de altura da torre implantada maximizava
+`área × altura` (proxy de área vendável), o que IGNORAVA o alvo: mesmo pedindo
+uma laje bem maior, ela preferia subir e manter ~500-600 m². Contradizia o
+mecanismo documentado ("aumentar o alvo exige altura menor"). Corrigido
+alinhando à mesma semântica da torre natural (`cUser || alto`): sobe até a
+MAIOR altura em que a laje ainda ATINGE o alvo; só cai para a maior laje
+possível (altura mais baixa) quando nenhuma altura comporta o alvo. Como
+`ajustar()` começa no alvo e só encolhe, `r.area >= alvo-1` = "o alvo coube
+inteiro naquela altura".
+
+**Teste** (`test_alvo_altura_permanente.js`): lote em L, variando o alvo —
+400→laje 400 @ H=68; 600→600 @ H=52; 900→900 @ H=36; 1300→1198 @ H=20. Ou
+seja, alvo maior = laje maior + altura menor (envelope máximo), como esperado.
+O teto (`test_teto_permanente.js`) confirma ~1316 m² de laje viável onde o
+campo antes desabilitava. Os 7 core + fallback + fiapo + alinhar-frente seguem
+passando. Validação visual pendente do usuário.
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia

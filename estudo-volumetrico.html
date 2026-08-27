@@ -940,9 +940,15 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     if(rA && rG) return rG.area > rA.area ? rG : rA;
     return rA || rG;
   };
-  /* sobe altura ate a maior em que a laje (do tamanho que couber) ainda
-     cabe respeitando o recuo no topo, maximizando area x altura (proxy da
-     area vendavel total). hFixo pula a busca e ajusta so naquela altura. */
+  /* MIRA A LAJE ALVO (mesma semantica da torre natural, "cUser || alto"): sobe
+     ate a MAIOR altura em que a laje ainda ATINGE o alvo; so cai para a maior
+     laje possivel (altura mais baixa) quando NENHUMA altura comporta o alvo.
+     Antes maximizava area x altura, o que IGNORAVA o alvo na escolha da altura
+     — aumentar a laje alvo nao deixava a torre mais baixa e larga (bug real: a
+     laje ficava travada ~600 quando o usuario queria o envelope maximo). Como
+     ajustar()/encaixe() comecam no alvo e so encolhem, r.area<=alvo sempre;
+     r.area>=alvo-1 significa "o alvo coube inteiro" naquela altura. hFixo pula
+     a busca. */
   let melhor=null;
   if(hFixo != null){
     const rLat = hFixo > baseIsenta ? fLat*hFixo : 0;
@@ -950,12 +956,16 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     if(r) melhor = {r:r, H:hFixo, rLat:rLat};
   } else {
     const dH=Math.max(pd, (hMax-Hbase)/8);
-    let melhorScore=0;
+    let melhorAlvo=null, melhorArea=null, maiorArea=0;
     for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
       const rLat = H > baseIsenta ? fLat*H : 0;
       const r = encaixe(rLat);
-      if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
+      if(!r) continue;
+      /* laco desce de hMax: o 1o H que atinge o alvo e o MAIS ALTO que atinge */
+      if(r.area >= alvo-1 && !melhorAlvo) melhorAlvo={r:r, H:H, rLat:rLat};
+      if(r.area > maiorArea){ maiorArea=r.area; melhorArea={r:r, H:H, rLat:rLat}; }
     }
+    melhor = melhorAlvo || melhorArea;
   }
   if(!melhor) return null;
 
@@ -1821,6 +1831,20 @@ function resolver(){
     }
   }
 
+  /* teto de laje VIAVEL, para habilitar/limitar o campo "Laje alvo" e o aviso.
+     Em lote comum e a maior laje da torre natural (maxLajeNat). Em lote
+     irregular, onde a natural colapsa (~0), e a maior laje que a torre
+     IMPLANTADA consegue — medida na altura mais BAIXA (Hbase+pd: menos recuo,
+     logo maior laje), com alvo = area do lote pra nao capar antes da hora.
+     Sem isso, o campo ficava DESABILITADO com "laje nao viavel" mesmo havendo
+     uma torre implantada de centenas de m2 (bug real: nao dava pra clicar no
+     campo e a laje travava no default). */
+  let maxLajeViavel = Math.max(maxLajeNat, best.laje||0);
+  if(maxLajeNat < 80 && nMaxTorre >= 1){
+    const tiMax = torreImplantada(T, area, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, false, Hbase+pd);
+    if(tiMax && tiMax.area > maxLajeViavel) maxLajeViavel = tiMax.area;
+  }
+
   const chegouAltura = nMaxTorre === 0 || best.nT >= nMaxTorre;
   const trava = implantada ? 'implantada'
               : cUser ? 'laje'
@@ -1863,7 +1887,7 @@ function resolver(){
           vagas:vagas,areaGaragem:areaGaragem,nSub:nSub,subNecess:subNecess,areaSubsolo:areaSubsolo,
           nBase:nBasePav,pdBase:pdBase,Hbase:Hbase,areaBase:areaBase,baseComputa:baseComputa,envB:envB,construida:construida,
           toEfetiva:toEfetiva,permExigida:permExigida,permMinima:permMinima,excedente:excedente,vc:vc,
-          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,maxLajeRecuos:maxLajeNat,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,compactada:compactada,hMax:hMax,fLat:fLat,usar15:usar15};
+          notaCA:notaCA,avisos:avisos,cUser:cUser,lajeDesejada:lajeDesejada,maxLajeRecuos:maxLajeViavel,pd:pd,fator:fator,rj:rj,rjEfetivo:rjEfetivo,baseIsenta:BASE_ISENTA,implantada:implantada,compactada:compactada,hMax:hMax,fLat:fLat,usar15:usar15};
 }
 
 /* =====================================================================

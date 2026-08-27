@@ -149,7 +149,18 @@ altura menor para caber — o mesmo mecanismo em ambos os casos:
   pavimento mais alto viável, sem mirar área nenhuma) quando NENHUM
   pavimento comporta o alvo dentro do CA disponível.
 - **Torre implantada**: mesmo campo (`alvoLaje`) passado como `alvo` para
-  `torreImplantada()`, ver seção abaixo.
+  `torreImplantada()`, ver seção abaixo. A seleção de altura da implantada
+  MIRA o alvo (mesma semântica de `cUser || alto`): sobe até a maior altura em
+  que a laje ainda atinge o alvo; só cai para a maior laje possível (altura mais
+  baixa) quando nenhuma altura comporta o alvo. Assim aumentar o alvo dá laje
+  maior + torre mais baixa (envelope máximo). Antes maximizava área×altura e
+  ignorava o alvo na escolha da altura (bug: laje travava ~600).
+- **Teto do campo (`maxLajeViavel` → `s.maxLajeRecuos` → `atualizarLimiteLaje`)**:
+  o enable/limite do campo `#ovLajeAlvo` usa a maior laje VIÁVEL — em lote comum
+  `maxLajeNat`, em lote irregular a maior laje da implantada na altura mais baixa
+  (`torreImplantada(..., hFixo=Hbase+pd)`). Sem isso o campo desabilitava com
+  "laje não viável" em lote irregular (onde a natural colapsa a ~0), mesmo
+  havendo torre implantada de centenas de m² (bug real).
 - **Laje natural que sobra em relação ao alvo, na altura já escolhida**: a
   seleção por `curva` acima só resolve quando ALGUMA altura naturalmente
   encolhe até o alvo. Em lote comum onde a altura já bate no teto do
