@@ -521,6 +521,33 @@ Validação visual no navegador pendente do usuário (ambiente sem ArcGIS).
 
 ---
 
+## 18. Torre implantada travando num fiapo quando a âncora é apertada
+O usuário mostrou um lote de 4.354 m² onde a torre implantada saiu com laje de
+só 60 m² (um quadrado minúsculo, CA 0,29), subindo ao máximo (75,5 m, recuo
+13,6 m), quando cabia uma laje bem maior ocupando outro canto — sem ter pedido
+retângulo/quadrado.
+
+**Causa**: no item 15 restaurei o fallback de posição (`ajustarGrade`), mas
+liguei ele como `ajustar(rLat) || ajustarGrade(rLat)` — o grid só rodava quando
+a âncora na maior testada devolvia NULL. Quando a âncora devolve um retângulo
+pequeno-porém-válido (spot apertado), o grid nunca era tentado, e a torre ficava
+presa no fiapo daquela posição em TODAS as alturas. Como a área ficava
+uniformemente pequena, o score `área × altura` acabava premiando a altura máxima
+(60 × 63 num H alto), gerando a torre alta e fininha.
+
+**Correção**: um passo `encaixe(rLat)` — usa a âncora quando ela já alcança ~o
+alvo (≥90%, preserva a colocação junto à rua e o lote comum não paga o grid);
+senão roda o grid e fica com o de MAIOR área. Assim, quando a âncora rende
+pouco, a torre migra para o canto onde cabe a laje maior, e o score passa a
+favorecer a altura certa (mais baixa e larga) em vez do fiapo alto.
+
+**Teste** (`test_fiapo_permanente.js`): lote em "L" 4.860 m² com a maior testada
+num cabo estreito (âncora apertada) e a cabeça larga aberta. Antes: fiapo no
+cabo. Agora: laje de 510 m² @ H=60 m, centrada na cabeça, recuo respeitado em
+toda aresta. Os 7 cenários core + fallback + alinhar-frente seguem passando.
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia

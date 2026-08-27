@@ -924,22 +924,36 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     return pts;
   };
 
+  /* melhor encaixe numa altura: a ancora na maior testada (ajustar) da a boa
+     colocacao junto a rua, mas quando aquele ponto e apertado ela devolve um
+     retangulo bem menor que o alvo — e ai o lugar MAIOR fica em outro canto do
+     lote. Antes o grid (ajustarGrade) so rodava quando ajustar era NULL, entao
+     um retangulo pequeno-porem-valido travava a torre num fiapo, mesmo havendo
+     lugar pra uma laje bem maior (bug real: laje de 60 m2 num lote de 4.354 m2
+     onde cabia muito mais). Agora: se a ancora ja alcanca ~o alvo, fica com ela
+     (colocacao junto a rua preservada, lote comum nao paga o grid); se rende
+     pouco, roda o grid e fica com o de MAIOR area. */
+  const encaixe=(rLat)=>{
+    const rA=ajustar(rLat);
+    if(rA && rA.area >= alvo*0.9) return rA;      /* ancora ja e boa: mantem */
+    const rG=ajustarGrade(rLat);
+    if(rA && rG) return rG.area > rA.area ? rG : rA;
+    return rA || rG;
+  };
   /* sobe altura ate a maior em que a laje (do tamanho que couber) ainda
-     cabe respeitando o recuo no topo. hFixo pula a busca e ajusta so
-     naquela altura — usado quando a altura ja foi escolhida por outro
-     mecanismo (ex.: a torre natural encolhendo o proprio pavimento-tipo
-     para bater na laje alvo, na altura que o otimizador ja decidiu). */
+     cabe respeitando o recuo no topo, maximizando area x altura (proxy da
+     area vendavel total). hFixo pula a busca e ajusta so naquela altura. */
   let melhor=null;
   if(hFixo != null){
     const rLat = hFixo > baseIsenta ? fLat*hFixo : 0;
-    const r = ajustar(rLat) || ajustarGrade(rLat);   /* fallback de posicao se a ancora falhar */
+    const r = encaixe(rLat);
     if(r) melhor = {r:r, H:hFixo, rLat:rLat};
   } else {
     const dH=Math.max(pd, (hMax-Hbase)/8);
     let melhorScore=0;
     for(let H=hMax; H >= Hbase+pd-0.01; H-=dH){
       const rLat = H > baseIsenta ? fLat*H : 0;
-      const r = ajustar(rLat) || ajustarGrade(rLat);   /* fallback de posicao se a ancora falhar */
+      const r = encaixe(rLat);
       if(r){ const sc=r.area*(H-Hbase); if(sc>melhorScore){ melhorScore=sc; melhor={r:r, H:H, rLat:rLat}; } }
     }
   }
