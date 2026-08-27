@@ -1191,8 +1191,13 @@ async function initMap(){
   mapa = L.map('map', {zoomControl:true, attributionControl:false, minZoom:10,
                        preferCanvas:true})
           .setView([-30.0500,-51.2050], 12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-              {subdomains:'abcd', maxZoom:20}).addTo(mapa);
+  /* SEM basemap externo: a CARTO (dark_all) passou a exigir chave de API e
+     agora estampa a marca d'agua "API KEY REQUIRED" nas tiles. Como o app
+     nao depende dela (o fundo do #map ja e escuro, e o contexto vem da grade
+     de ZOTs colorida + dos lotes vetoriais + numeros, todos do ArcGIS aberto
+     da prefeitura, sem chave), o basemap foi descartado. Navegacao: chips de
+     bairro e a busca de endereco. Se um dia quiser ruas de fundo de novo sem
+     chave, da pra plugar um tileLayer key-free aqui (ex.: OSM padrao). */
 
   /* empilhamento (de baixo para cima):
        zonas  - imagem da grade do Anexo II, so em escala aberta
@@ -2122,10 +2127,19 @@ function desenhar(s){
   }
 
   let y = 0;
-  if(s.nBase > 0 && s.envB.anel.length > 3){
-    /* base isenta ate a divisa, desenhada como os 3 pavimentos de ~4,17 m */
+  if(s.nBase > 0){
+    /* base isenta ate a divisa, desenhada como os pavimentos de ~4,17 m.
+       FALLBACK: em lote irregular o recorte da base (envB) colapsa pelo
+       mesmo slivering do recortar() — antes, nesse caso, a base NAO era
+       desenhada E o 'y' ficava em 0, entao a torre descia pro chao e o
+       predio parecia flutuar/sem embasamento (bug real relatado). Agora,
+       quando envB colapsa, desenha a base com o proprio contorno do lote
+       (a base vai a divisa mesmo; o recuo de jardim so a apararia na frente)
+       — e o 'y' vai a Hbase SEMPRE que ha base, para a torre pousar na cota
+       certa. */
+    const baseAnel = (s.envB && s.envB.anel && s.envB.anel.length > 3) ? s.envB.anel : T.anel;
     for(let i=0;i<s.nBase;i++){
-      const b = laje(s.envB.anel, cx, cy, s.pdBase*.96, i*s.pdBase, 0x3a5570, .95, 0x54748f);
+      const b = laje(baseAnel, cx, cy, s.pdBase*.96, i*s.pdBase, 0x3a5570, .95, 0x54748f);
       if(b) grupo.add(b);
     }
     y = s.Hbase;

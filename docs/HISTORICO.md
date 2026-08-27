@@ -467,6 +467,31 @@ consegue abrir o navegador com o ArcGIS ao vivo).
 
 ---
 
+## 16. Basemap CARTO virou "API KEY REQUIRED" + base isenta sumindo no 3D
+Dois problemas relatados juntos.
+
+**"Sinal de API" no mapa.** Confirmei baixando uma tile do basemap: a CARTO
+(`basemaps.cartocdn.com/dark_all`) agora estampa uma marca d'água diagonal
+"API KEY REQUIRED — carto.com/basemaps/apikey" — deprecaram o uso anônimo.
+O basemap é descartável (o app desenha os lotes como vetores do ArcGIS aberto
+por cima; o `#map` já tem fundo escuro). Removido o `L.tileLayer` da CARTO no
+`initMap`. Navegação segue por chips de bairro + busca de endereço. Ficam ainda
+duas chamadas externas, ambas keyless: o ArcGIS da prefeitura (LOTES/EIXOS/
+NÚMEROS — o dado essencial) e o Nominatim (só a caixa de busca de endereço).
+
+**Prédio "flutuando" / base isenta ausente no 3D.** Em `desenhar()`, a base
+isenta (até 12,5 m) só era desenhada `if(nBase>0 && envB.anel.length>3)`. Em
+lote irregular o recorte da base (`envB`) colapsa pelo slivering do `recortar()`
+— aí a base sumia E o `y` ficava em 0, então a torre descia pro chão sem
+embasamento, parecendo flutuar. É "às vezes" porque só nos lotes irregulares
+(os mesmos da torre implantada). Corrigido: `if(nBase>0)` sempre desenha a base,
+usando `envB.anel` quando válido e o próprio `T.anel` como fallback (a base vai
+à divisa mesmo), e `y=Hbase` sempre que há base — a torre pousa na cota certa.
+Correção lógica; **validação visual pendente do usuário** (navegador/ArcGIS
+bloqueado neste ambiente). A suíte de geometria (7) segue passando.
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia

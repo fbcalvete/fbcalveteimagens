@@ -271,6 +271,23 @@ laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
 Extruda o polígono real do lote: base (nBasePav pavimentos até a divisa) + torre
 (best.nT pavimentos a partir de best.anel) + wireframe do envelope máximo.
 
+**Base isenta no 3D — cuidado com o colapso do envB**: a base é desenhada a
+partir de `s.envB.anel` (o recorte da base, rDiv=0). Em lote irregular esse
+recorte colapsa pelo mesmo slivering do `recortar()`. Antes, o código só
+desenhava a base `if(nBase>0 && envB.anel.length>3)` — no colapso a base
+**sumia** E o `y` (cota onde a torre começa) ficava em 0, então a torre descia
+pro chão e o prédio parecia **flutuar/sem embasamento** (bug real relatado). Agora:
+`if(nBase>0)` sempre desenha a base (usando `envB.anel` quando válido, senão o
+próprio `T.anel` como fallback — a base vai à divisa mesmo) e `y = Hbase` sempre
+que há base, para a torre pousar na cota certa. Se mexer no 3D, não volte a
+condicionar o desenho da base à validade do `envB`.
+
+**Sem basemap externo**: a CARTO (`dark_all`) passou a exigir chave de API e
+estampa "API KEY REQUIRED" nas tiles — foi **removida** (o `#map` já tem fundo
+escuro; contexto vem da grade de ZOTs + lotes vetoriais + números, todos do
+ArcGIS aberto). Navegação por chips de bairro + busca de endereço. Não recolocar
+a CARTO; se quiser ruas de fundo, um tileLayer key-free (OSM padrão) no `initMap`.
+
 Barra de cima: `#tbMassa`/`#btnPlantas` (troca de visão), `#tgRetangular`
 ("Laje retangular" — força a torre implantada a não deformar, ver seção acima),
 `#tgEnv` (mostra/esconde o wireframe do envelope máximo).
