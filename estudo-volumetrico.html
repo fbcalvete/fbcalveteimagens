@@ -680,21 +680,32 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
       ancora=[(maiorF.a[0]+maiorF.b[0])/2, (maiorF.a[1]+maiorF.b[1])/2];
     }
   }
+  /* direcao da MAIOR ARESTA de um conjunto (nao a corda inicio->fim do grupo).
+     A corda vira DIAGONAL quando o grupo atravessa uma quina ou tem a frente
+     fragmentada em varios segmentos (contorno cadastral ruidoso) — e ai a laje
+     saia torta (losango a 45o) e pequena, mesmo com uma testada longa e reta
+     disponivel (bug real: lote de 3 ruas com a frente direita fragmentada). A
+     maior aresta unica e sempre uma direcao de rua de verdade. */
+  const dirMaiorAresta=(edges)=>{
+    let d=null, L=0;
+    for(const e of edges){ const l=Math.hypot(e.b[0]-e.a[0],e.b[1]-e.a[1]); if(l>L){ L=l; d=[e.b[0]-e.a[0], e.b[1]-e.a[1]]; } }
+    return d;
+  };
   if(dirRef){ /* ja definido pelo alinhar-frente acima */ }
   else if(idxEsquina>=0 && maiorAng>ANG_ESQUINA){
     esquina = true;
     const ladoA=grupo.slice(0,idxEsquina+1), ladoB=grupo.slice(idxEsquina+1);
-    /* o vertice da esquina fica numa PONTA da laje (nao no meio) — a laje
-       estende do vertice para dentro do lado escolhido, entao dirRef aponta
-       do vertice PARA LONGE dele (nao o contrario). */
     const cornerPt = grupo[idxEsquina].b;
-    let longe;
-    if(compr(ladoA)>=compr(ladoB)) longe = ladoA[0].a; else longe = ladoB[ladoB.length-1].b;
-    dirRef=[longe[0]-cornerPt[0], longe[1]-cornerPt[1]];
+    const lado = compr(ladoA)>=compr(ladoB) ? ladoA : ladoB;
+    /* orienta pela maior aresta do lado escolhido; aponta do vertice da
+       esquina PARA LONGE dele (a laje estende do vertice pra dentro do lado). */
+    let d = dirMaiorAresta(lado) || [1,0];
+    const longe = compr(ladoA)>=compr(ladoB) ? ladoA[0].a : ladoB[ladoB.length-1].b;
+    if((longe[0]-cornerPt[0])*d[0] + (longe[1]-cornerPt[1])*d[1] < 0){ d=[-d[0],-d[1]]; }
+    dirRef=d;
     ancora = cornerPt.slice();
   } else {
-    const e0=grupo[0], e1=grupo[grupo.length-1];
-    dirRef=[e1.b[0]-e0.a[0], e1.b[1]-e0.a[1]];
+    dirRef = dirMaiorAresta(grupo) || [1,0];
     /* ponto no meio do comprimento acumulado do grupo (centraliza na testada
        real, nao na corda reta, quando ha leve curvatura) */
     const metade=compr(grupo)/2;

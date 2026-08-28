@@ -582,6 +582,36 @@ passando. Validação visual pendente do usuário.
 
 ---
 
+## 20. Torre saindo torta (losango a 45o) e pequena em lote de esquina
+O usuário mostrou um cluster (remembramento) de 3 ruas onde a torre virou um
+losango de 140 m² torto no meio do lote — claramente errado, cabia muito mais.
+
+**Causa** (reproduzida sinteticamente): a orientação da laje da torre implantada
+vinha da CORDA do maior grupo de frentes contíguas (vetor início→fim do grupo).
+Essa corda fica DIAGONAL quando o grupo atravessa uma quina (lote de esquina com
+2+ ruas) ou quando a frente está FRAGMENTADA em vários segmentos curtos (contorno
+cadastral ruidoso — no print, a testada direita aparecia partida em 7 pedaços:
+19,9·3,9·2,8·3,3·5,4·5,3·5,4). Com a orientação diagonal, o retângulo/losango
+sai a ~45° e o encaixe respeitando os recuos fica bem menor do que caberia
+alinhado à testada longa e reta. Teste sintético: lote 60×40 com a frente direita
+fragmentada dava laje 470 m² @ 33,7° (e 288 m² @ 123° no caminho da laje compacta,
+hFixo alto) em vez de 600 m² @ 0°.
+
+**Correção**: a orientação passou a vir da **maior ARESTA de frente única** do
+grupo/lado escolhido (`dirMaiorAresta`), não da corda do grupo. A maior aresta é
+sempre uma direção de rua de verdade — robusta a quinas e a fragmentação. A
+ancoragem (vértice da esquina ou meio da testada) continua igual. Depois do fix,
+o mesmo lote fragmentado dá 600 m² @ 0° (e 553 @ 0° no hFixo alto), alinhado à
+maior testada.
+
+**Teste** (`test_frag_permanente.js`): lote com frente fragmentada confirma
+orientação 0° e laje grande. Os 7 core + fallback + fiapo + alinhar-frente seguem
+passando. Nota: isso NÃO é o mesmo que o botão "Alinhar frente" — aquele usa a
+maior aresta entre TODAS as frentes e ancora no meio dela; esta correção usa a
+maior aresta do GRUPO/LADO já escolhido, mantendo a ancoragem por esquina.
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia
