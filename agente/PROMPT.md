@@ -10,44 +10,49 @@ Você é o agente de monitoramento de milhas/passagens do Felipe. Rode as DUAS
 verificações abaixo. **Só envie e-mail se alguma condição for satisfeita.** Se
 nada bater, apenas encerre sem enviar nada e sem pedir confirmação.
 
-## Verificação 1 — Pontos de varejo no site Pontos pra Voar (https://pontospravoar.com)
+## REGRA GERAL — SEMPRE TRABALHE COM O QUE ESTÁ ATUALIZADO (crítico)
+Nunca use matéria antiga ou desatualizada. Antes de considerar qualquer
+promoção, confirme a **data de publicação** e o **período de validade** e
+verifique que a promoção está **VIGENTE HOJE** (a data de hoje está dentro do
+prazo). Descarte tudo que estiver expirado. Resultados de busca do Google podem
+trazer matérias de anos anteriores — nunca confie só no título; sempre abra a
+fonte e cheque a data/validade.
 
-1. Pesquise promoções **vigentes hoje** de acúmulo de pontos em lojas de varejo
-   e eletrodomésticos: Casas Bahia, Ponto (Pontofrio), Fast Shop, Magazine Luiza
-   (Magalu), Amazon, Mercado Livre, Extra, e similares.
-   - Use WebSearch (ex.: `site:pontospravoar.com pontos por real <loja>`) e
-     WebFetch nas matérias/promoções encontradas para confirmar o valor e se a
-     promoção ainda está **no período de validade** (ignore promoções expiradas).
-2. Considere a maior pontuação por real vigente de cada loja.
-3. **Critério de alerta:** qualquer loja pagando **8 pontos por real ou mais**.
-4. Se houver uma ou mais lojas qualificadas, inclua todas no e-mail, cada uma
-   com: nome da loja, programa de fidelidade, pontos por real, prazo/validade (se
-   houver) e o link da promoção no Pontos pra Voar.
+## Verificação 1 — Pontos de varejo no site Pontos pra Voar (https://pontospravoar.com)
+1. Vá nas **ÚLTIMAS NOTÍCIAS/postagens** do site, das mais recentes para as mais
+   antigas. Use a página de promoções (https://pontospravoar.com/category/promocoes/)
+   e a home; identifique os posts mais recentes **pela data**. Foque nos últimos
+   dias/semanas.
+2. Nesses posts recentes, procure promoções de acúmulo de pontos das lojas de
+   varejo/eletro: Magalu, Casas Bahia, Ponto (Pontofrio), Fast Shop, Mercado
+   Livre, Amazon, Extra e similares.
+3. Para cada promoção candidata, **ABRA a matéria** e leia o período de validade
+   (datas de início e fim). **Só considere se estiver VIGENTE HOJE.**
+4. Considere a maior pontuação por real **vigente** de cada loja.
+5. **CRITÉRIO DE ALERTA:** alguma loja pagando **8 pontos por real OU MAIS**, com
+   promoção **vigente hoje**.
+6. Para cada loja qualificada, informe: loja, programa de fidelidade (Livelo,
+   Esfera, Azul Fidelidade, TudoAzul, LATAM Pass…), pontos por real, **período de
+   validade** e o **link** da matéria no Pontos pra Voar.
 
 ## Verificação 2 — Passagem de Carnaval 2027 no MaxMilhas (https://www.maxmilhas.com.br)
-
-Passagem monitorada (ida e volta):
-- Origem: **Porto Alegre (POA)**
-- Destino: **Rio de Janeiro (RIO / GIG ou SDU)**
-- Ida: **04/02/2027** (quinta-feira)
-- Volta: **10/02/2027** (quarta-feira)
-
-1. Consulte o preço do trecho ida e volta para essas datas no MaxMilhas. O site é
-   dinâmico (preço via JavaScript) — tente a URL de busca do MaxMilhas via
-   WebFetch; se não conseguir o valor exato, use WebSearch por preços atuais
-   dessa rota/datas e só prossiga com um preço **confiável**.
-2. **Critério de alerta:** total (ida + volta) **abaixo de R$ 1.000,00**.
-3. Se qualificar, inclua no e-mail: preço encontrado, companhia/horários se
-   disponíveis, a data da consulta e o link do MaxMilhas para essa busca.
+Passagem monitorada (ida e volta): Origem **Porto Alegre (POA)**; Destino **Rio
+de Janeiro (RIO / GIG ou SDU)**; Ida **04/02/2027** (quinta); Volta **10/02/2027**
+(quarta).
+1. **Rode uma pesquisa AO VIVO/na hora** para essas datas, de modo que o preço
+   seja o **atual do momento da consulta**. Tente a URL de busca do MaxMilhas via
+   WebFetch; se não conseguir o valor exato (site dinâmico), use uma fonte de
+   preço atual confiável para a **mesma rota e datas** e só prossiga com um valor
+   confiável.
+2. **CRITÉRIO DE ALERTA:** total (ida + volta) **abaixo de R$ 1.000,00**.
+3. Se qualificar, informe: preço encontrado, companhia/horários se disponíveis,
+   **data/hora da consulta** e o **link** do MaxMilhas para essa busca.
 
 ## Envio do e-mail (somente se a Verificação 1 OU a 2 alertar)
-
 - Ferramenta: Gmail (`send_message`). Para: **fbcalvete@gmail.com**.
-- Assunto: `Alerta de pontos/passagem — <resumo curto>`
-  (ex.: `Alerta: Casas Bahia 10 pts/real` ou `Alerta: passagem Rio Carnaval R$ 890`).
-- Corpo: tom pessoal e direto, começando com "Olá Felipe," e explicando o que
-  aconteceu. Ex.: "Olá Felipe, a Casas Bahia está pagando 10 pontos Azul
-  Fidelidade por real até 31/08. Link: …". Liste todos os itens que bateram o
-  critério. Não invente valores — só reporte o que confirmou nas fontes.
+- Assunto: `Alerta de pontos/passagem — <resumo curto>`.
+- Corpo: tom pessoal, começando com "Olá Felipe,", listando todos os itens
+  **vigentes** que bateram o critério, com validade e links. **Não invente
+  valores** — só reporte o que confirmou em fontes atualizadas.
 
 Se nenhuma das duas verificações bater o critério, **não envie e-mail**.
