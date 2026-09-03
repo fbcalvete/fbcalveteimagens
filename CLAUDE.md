@@ -166,6 +166,26 @@ propósito — mede capacidade, não forma. Testado (`test_prop_permanente.js`):
 proporções 40×15, 15×40, 50×12 e o quadrado 24,5×24,5 num lote amplo — em todas
 o retângulo obtido bate a proporção pedida, `area == alvo`, e o recuo é
 respeitado em **toda aresta** (não só vértices).
+
+**Bloco `compactada` (helper `adotarRet`) — quando "Laje retangular"/"Alinhar
+frente" está ligado (`forcarRet`)**: a laje TEM que virar um retângulo da
+proporção pedida, SEMPRE. Tenta primeiro na altura já escolhida
+(`torreImplantada(..., hFixo=best.H, prop)`) — não mexe no gabarito quando o
+retângulo cabe bem ali. Se a proporção é extrema demais para caber naquela
+altura (o recuo lateral cresce com H e estrangula a laje — ex.: 10×50 num lote
+raso, que ali só caberia como um fiapo ou nem isso, `cf.area < alvo*0.6` ou
+`null`), **busca a altura** em que o retângulo cabe (`hFixo=undefined`, mesma
+semântica da torre implantada: mira o alvo e baixa o gabarito), e `adotarRet`
+recalcula `nT/altura/CA`. `forcarRet` **adota sempre** (mesmo rendendo menos que
+o envelope natural — o usuário pediu o retângulo). Isso conserta um bug real: a
+laje ficava no envelope natural não-retangular (ex.: 521 m²) e a metragem não
+batia com o alvo, porque `cf` voltava `null` na altura fixa e nada era adotado —
+o botão "não fazia nada" e a laje não virava retângulo. Sem `forcarRet`, o bloco
+só encolhe a laje que **sobra** em relação ao alvo (`best.laje > alvo*1.02`) na
+MESMA altura (comportamento antigo). Testado em `test_forcaret_permanente.js`
+(lote raso 60×30 e amplo 45×40, proporções 1:1, 0,2 e 3:1): em todos sai um
+retângulo da proporção pedida, `area == shoelace`, recuo respeitado em toda
+aresta, altura mantida quando cabe e baixada só quando a proporção obriga.
 - **Torre natural**: `lajeDesejada = alvoLaje`; percorre `curva` (um envelope
   por altura) e escolhe o `nT` mais alto cujo `laje >= lajeDesejada` **e**
   caiba no CA (`cUser`). `best = cUser || alto` — só cai para `alto` (o

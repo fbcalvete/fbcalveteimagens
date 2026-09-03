@@ -1800,22 +1800,55 @@ function resolver(){
      (torreImplantada com hFixo=best.H, pulando a propria busca de altura),
      reaproveitando a mesma ancoragem/deformacao da torre implantada. */
   let compactada = false;
-  /* Retangulariza/compacta a torre NATURAL viavel (laje>=80; o fiapo fica
-     para o bloco da torre implantada abaixo) na MESMA altura ja escolhida,
-     quando: (a) o usuario pediu "Laje retangular" ou "Alinhar frente" — force
-     um retangulo mesmo sem sobrar area; ou (b) a laje natural sobra em relacao
-     ao alvo — encolhe pro alvo. Antes so o caso (b) disparava, entao os botoes
-     nao faziam nada quando a laje natural ja era <= alvo (bug: "Laje retangular
-     nao funciona"). soRetangular liga o modo retangulo puro (sem deformar);
-     alinharFrente forca a orientacao pela maior testada unica. */
   const forcarRet = soRetangular || alinharFrente;
-  if(best.nT > 0 && best.laje >= 80 && (forcarRet || best.laje > alvoLaje*1.02)){
-    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, best.H, alinharFrente, propLaje);
-    if(cf && cf.area > 20 && cf.area <= best.laje + 1){
-      const acTorreC = Math.min(best.nT*cf.area, Math.max(0, acMax-acBase));
-      best = {nT:best.nT, H:best.H, laje:cf.area, anel:cf.anel, rDiv:best.rDiv,
-              acTorre:acTorreC, acTotal:Math.min(acTorreC+acBase, acMax), sat:best.sat};
-      compactada = true;
+  /* Adota um retangulo `cf` (vindo de torreImplantada) como o pavimento-tipo.
+     Se a altura de `cf` mudou em relacao a best.H (a busca de altura baixou o
+     gabarito para caber a proporcao), recalcula nT/altura/CA como na torre
+     implantada; se ficou na mesma altura, preserva nT. lajeReal passa a bater
+     com o retangulo desenhado (best.laje = cf.area, best.anel = cf.anel). */
+  const adotarRet = (cf) => {
+    let nTc, Hc;
+    if(Math.abs(cf.H - best.H) < 0.01){ nTc = best.nT; Hc = best.H; }
+    else {
+      const nAlt = Math.max(1, Math.floor((cf.H - Hbase)/pd + 1e-6));
+      const nCA = acMax > acBase ? Math.floor((acMax-acBase)/cf.area) : 0;
+      nTc = Math.max(1, Math.min(nMaxTorre, nAlt, nCA || nAlt));
+      Hc = Hbase + nTc*pd;
+    }
+    const acTorreC = Math.min(nTc*cf.area, Math.max(0, acMax-acBase));
+    best = {nT:nTc, H:Hc, laje:cf.area, anel:cf.anel,
+            rDiv: Hc > BASE_ISENTA ? fLat*Hc : 0,
+            acTorre:acTorreC, acTotal:Math.min(acTorreC+acBase, acMax), sat:best.sat};
+    compactada = true;
+  };
+  /* Retangulariza/compacta a torre NATURAL viavel (laje>=80; o fiapo fica para
+     o bloco da torre implantada abaixo). Dois casos:
+     (a) forcarRet — o usuario pediu "Laje retangular" ou "Alinhar frente":
+         a laje TEM que virar um retangulo da proporcao pedida (propLaje),
+         SEMPRE, mesmo que renda menos area que o envelope natural. Tenta
+         primeiro na altura ja escolhida (nao mexe no gabarito quando o
+         retangulo cabe bem ali). Se a proporcao for extrema demais para caber
+         naquela altura (o recuo lateral cresce com H e estrangula a laje —
+         ex.: 10x50 num lote raso, que ali so caberia como um fiapo ou nem
+         isso), BUSCA a altura em que o retangulo cabe (hFixo=undefined, mesma
+         semantica da torre implantada: mira o alvo e desce o gabarito). Isso
+         garante que "Laje retangular" NUNCA cai de volta no envelope natural
+         nao-retangular (bug real: laje ficava 521 m² e sem forma de retangulo,
+         e a metragem nao batia com o alvo, porque cf voltava null na altura
+         fixa e nada era adotado).
+     (b) sem forcar, so quando a laje natural SOBRA em relacao ao alvo
+         (best.laje > alvo*1.02): encolhe pro alvo na MESMA altura. */
+  if(best.nT > 0 && best.laje >= 80){
+    if(forcarRet){
+      let cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, best.H, alinharFrente, propLaje);
+      if(!cf || cf.area < alvoLaje*0.6){
+        const cfB = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, undefined, alinharFrente, propLaje);
+        if(cfB && (!cf || cfB.area > cf.area)) cf = cfB;
+      }
+      if(cf && cf.area > 20) adotarRet(cf);
+    } else if(best.laje > alvoLaje*1.02){
+      const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, false, best.H, false, propLaje);
+      if(cf && cf.area > 20 && cf.area <= best.laje + 1) adotarRet(cf);
     }
   }
 

@@ -651,6 +651,55 @@ regressão). **Validação em navegador real fica pendente do lado do usuário**
 
 ---
 
+## 22. "Laje retangular" ainda saía como o envelope natural (blob), não retângulo
+Logo depois do item 21 o usuário testou num lote real: com Largura 10 /
+Profundidade 50 (proporção 10:50 = 0,2) e alvo 500, a laje continuou o **envelope
+natural não-retangular** (521 m²) e a metragem exibida (521) não batia com o alvo.
+
+**Causa**: o bloco `compactada` chamava `torreImplantada` com a altura FIXA no
+resultado do otimizador (`hFixo=best.H`, ~63,5 m). Nessa altura o recuo lateral
+é enorme (0,18 × 63,5 = 11,4 m por lado), e um retângulo de 50 m de profundidade
+precisaria de ~65 m de lote — não cabe. `torreImplantada` devolvia `null` (não
+conseguia semear nem um retângulo pequeno da proporção naquela altura), então
+**nada era adotado** e `best` continuava o envelope natural. O botão "não fazia
+nada" e a laje não virava retângulo. Funcionava em teste sintético (lote 45×40
+onde o mesmo 0,2 cabia como fiapo de ~115 m²), mas num lote mais raso voltava
+`null` e caía no blob.
+
+**Correção** (bloco `compactada`, helper novo `adotarRet`): quando "Laje
+retangular"/"Alinhar frente" está ligado (`forcarRet`), a laje passa a ser um
+retângulo da proporção pedida SEMPRE. Tenta na altura já escolhida (mantém o
+gabarito quando cabe bem ali); se a proporção não cabe (`cf` nulo ou
+`cf.area < alvo*0,6`), **busca a altura** em que o retângulo cabe
+(`hFixo=undefined` — mesma semântica da torre implantada, mira o alvo e baixa o
+gabarito), e `adotarRet` recalcula nT/altura/CA. `forcarRet` adota sempre (mesmo
+rendendo menos área que o envelope natural — o usuário pediu o retângulo). Assim
+"Laje retangular" NUNCA cai de volta no envelope natural. Sem `forcarRet`, o
+bloco continua só encolhendo a laje que **sobra** em relação ao alvo, na mesma
+altura (comportamento do item 21 inalterado).
+
+Consequência esperada e honesta: uma proporção profunda demais para caber na
+altura máxima (10:50) resulta num prédio mais BAIXO (o recuo menor abre espaço
+para a profundidade) — coerente com o modelo "aumentar/estreitar a laje exige
+altura menor para caber". A metragem exibida passa a bater com o retângulo
+realmente desenhado (não mais 521). Nota: se a proporção 10:50 for maior que a
+profundidade útil do lote, nem no gabarito mínimo dá para chegar aos 500 m² —
+o app mostra o MAIOR retângulo daquela proporção que cabe, com a área real.
+
+**Importante para o usuário**: o retângulo estrito da proporção só é aplicado com
+o botão **"Laje retangular"** (ou "Alinhar frente") LIGADO — é o que a dica do
+campo diz. Com o botão desligado, os campos W/D só semeiam a proporção inicial e
+a laje pode acompanhar o contorno/deformar.
+
+**Teste** (`test_forcaret_permanente.js`): lote raso 60×30 e amplo 45×40, nas
+proporções 1:1, 0,2 (extrema) e 3:1 — em todos sai um retângulo da proporção
+pedida, `area == shoelace`, recuo respeitado em toda aresta; altura mantida
+quando cabe, baixada só quando a proporção obriga. Regressão completa (7 core +
+fallback + fiapo + alinhar + frag + alvo-altura + teto + prop) segue passando.
+**Validação em navegador real pendente do lado do usuário.**
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia
