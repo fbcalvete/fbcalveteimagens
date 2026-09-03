@@ -298,7 +298,11 @@ table.q tr.em td{color:var(--paper)} table.q tr.em td:last-child{color:var(--bp)
         <div class="f"><label>Pé-direito (m)</label><input id="pd" type="number" value="3.0" step="0.05"></div>
         <div class="f"><label>Laje alvo (m²)</label><input id="ovLajeAlvo" type="number" step="10" min="30" value="600"><div id="lajeLimite" class="hint" style="display:none;color:#ff6b6b;margin-top:5px"></div></div>
       </div>
-      <div class="hint" style="margin-top:2px">O pavimento-tipo mira essa área de laje — reduzir a área ganha recuo e permite subir mais; aumentar exige altura menor para caber. Também é o alvo da torre implantada, em terrenos irregulares demais para a torre natural.</div>
+      <div class="row2">
+        <div class="f"><label>Largura da laje (m)</label><input id="ovLajeW" type="number" step="0.5" min="4" value="24.5"></div>
+        <div class="f"><label>Profundidade da laje (m)</label><input id="ovLajeD" type="number" step="0.5" min="4" value="24.5"></div>
+      </div>
+      <div class="hint" style="margin-top:2px">O pavimento-tipo mira essa área de laje — reduzir a área ganha recuo e permite subir mais; aumentar exige altura menor para caber. Também é o alvo da torre implantada, em terrenos irregulares demais para a torre natural. A <b>largura × profundidade</b> define a proporção do retângulo (largura acompanha a testada); ao mudar a área, os lados se reescalam mantendo a proporção, e ao editar um lado a área é recalculada. O botão <b>Laje retangular</b> usa exatamente esse retângulo.</div>
       <div class="row2">
         <div class="f"><label>Uso da base isenta</label><select id="usoBase"><option value="gar">Estacionamento (não computa CA)</option><option value="com">Uso computável (comercial/outro)</option></select></div>
         <div class="f" style="align-self:end"><div class="hint" style="margin:0">A base isenta é modelada como 3 pavimentos de ~4,17 m (12,5 m) na divisa. Como estacionamento, não entra no CA — o coeficiente todo vai para a torre.</div></div>
@@ -612,7 +616,13 @@ function pontoNoPoligono(p, anel){
    contorno legal (busca radial a partir do retangulo encontrado) em vez de
    insistir num formato reto. Sobe ate a maior altura em que a laje (do
    tamanho que couber) ainda cabe respeitando o recuo no topo. */
-function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular, hFixo, alinharTestada){
+function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetangular, hFixo, alinharTestada, prop){
+  /* prop = proporcao largura/profundidade do retangulo alvo (W/D). Vem dos
+     campos "Largura/Profundidade da laje". 1 = quadrado (comportamento antigo).
+     A largura W corre ao longo da testada (dx); a profundidade D e perpendicular
+     (nx, para dentro do lote). Invariante: W*D = alvo, W/D = prop -->
+     W = sqrt(alvo*prop), D = sqrt(alvo/prop). */
+  prop = (prop && prop > 0) ? prop : 1;
   const anel = T.anel;
   const nv = anel.length-1;
   if(nv < 3) return null;
@@ -739,7 +749,7 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
   /* laje retangular, comecando quadrada no alvo, sempre encostada no recuo
      de jardim a partir da ancora (centro da testada ou vertice da esquina) */
   const ajustar=(rLat)=>{
-    let W=Math.sqrt(alvo), D=alvo/W;
+    let W=Math.sqrt(alvo*prop), D=Math.sqrt(alvo/prop);
     for(let it=0; it<26; it++){
       /* na esquina a ancora e o vertice do lote, numa PONTA da laje — desloca
          rj+meia largura para dentro do lado escolhido (a laje tambem precisa
@@ -786,7 +796,7 @@ function torreImplantada(T, alvo, rj, fLat, hMax, Hbase, baseIsenta, pd, soRetan
     return true;
   };
   const fitEm=(cx,cy,rLat)=>{
-    let W=Math.sqrt(alvo), D=alvo/W;
+    let W=Math.sqrt(alvo*prop), D=Math.sqrt(alvo/prop);
     for(let it=0; it<26; it++){
       const c=ret(cx,cy,W,D);
       if(retanguloLegal(c, rLat)) return {anel:c.concat([c[0]]), area:W*D, W:W, D:D, cx:cx, cy:cy};
@@ -1754,6 +1764,10 @@ function resolver(){
   const ovLajeVazio = !$('ovLajeAlvo') || $('ovLajeAlvo').value.trim() === '';
   const alvoLaje = ovLajeVazio ? 600 : Math.max(30, num('ovLajeAlvo'));
   const lajeDesejada = alvoLaje;
+  /* proporcao largura/profundidade do retangulo alvo, vinda dos campos
+     "Largura/Profundidade da laje". So molda a laje quando a torre implantada
+     ou a compactacao entram em acao (a torre natural cheia nao e retangulo). */
+  const propLaje = (num('ovLajeW') > 0 && num('ovLajeD') > 0) ? num('ovLajeW')/num('ovLajeD') : 1;
   let nUser = 0;
   for(const c of curva) if(lajeDesejada <= c.laje + .5 && (c.nT*lajeDesejada + acBase) <= acMax + .5) nUser = c.nT;
   const cUser = curva.find(c => c.nT === nUser) || null;
@@ -1796,7 +1810,7 @@ function resolver(){
      alinharFrente forca a orientacao pela maior testada unica. */
   const forcarRet = soRetangular || alinharFrente;
   if(best.nT > 0 && best.laje >= 80 && (forcarRet || best.laje > alvoLaje*1.02)){
-    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, best.H, alinharFrente);
+    const cf = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, forcarRet, best.H, alinharFrente, propLaje);
     if(cf && cf.area > 20 && cf.area <= best.laje + 1){
       const acTorreC = Math.min(best.nT*cf.area, Math.max(0, acMax-acBase));
       best = {nT:best.nT, H:best.H, laje:cf.area, anel:cf.anel, rDiv:best.rDiv,
@@ -1824,7 +1838,7 @@ function resolver(){
   let implantada = false;
   const maxLajeNat = curva.length ? Math.max.apply(null, curva.map(c=>c.laje)) : 0;
   if(!compactada && (maxLajeNat < 80 || best.laje < 80) && nMaxTorre >= 1){
-    const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, (soRetangular||alinharFrente), undefined, alinharFrente);
+    const ti = torreImplantada(T, alvoLaje, rjEfetivo, fLat, hMax, Hbase, BASE_ISENTA, pd, (soRetangular||alinharFrente), undefined, alinharFrente, propLaje);
     if(ti && ti.area > 40){
       const nAlt = Math.max(1, Math.floor((ti.H - Hbase)/pd + 1e-6));
       const nCA = acMax > acBase ? Math.floor((acMax-acBase)/ti.area) : 0;
@@ -2472,8 +2486,34 @@ function atualizarLimiteLaje(s){
       : 'Os recuos impedem lajes maiores que '+fmt(limite,0)+' m².';
   }
   const atual=Number(el.value);
-  if(!semLaje && Number.isFinite(atual) && atual>limite){ el.value=String(limite); return true; }
+  if(!semLaje && Number.isFinite(atual) && atual>limite){ el.value=String(limite); ajustarLadosLaje(); return true; }
   return false;
+}
+/* Reescala os lados (Largura/Profundidade) a partir da área alvo mantendo a
+   proporção atual W/D — NÃO recalcula (o chamador decide). Usada quando a área
+   muda por edição do usuário ou pelo clamp de atualizarLimiteLaje. */
+function ajustarLadosLaje(){
+  const elA=$('ovLajeAlvo'), elW=$('ovLajeW'), elD=$('ovLajeD');
+  if(!elA||!elW||!elD) return;
+  const A=parseFloat(elA.value); if(!(A>0)) return;
+  const W=parseFloat(elW.value), D=parseFloat(elD.value);
+  const prop=(W>0 && D>0) ? W/D : 1;
+  elW.value=(Math.sqrt(A*prop)).toFixed(1);
+  elD.value=(Math.sqrt(A/prop)).toFixed(1);
+}
+/* Liga os três campos (área, largura, profundidade) pela invariante A = W×D:
+   editar a ÁREA reescala os lados mantendo a proporção; editar um LADO recalcula
+   a área. Depois recalcula o modelo. */
+function sincronizarLaje(origem){
+  const elA=$('ovLajeAlvo'), elW=$('ovLajeW'), elD=$('ovLajeD');
+  if(!elA||!elW||!elD){ calcular(); return; }
+  if(origem==='lado'){
+    const W=parseFloat(elW.value), D=parseFloat(elD.value);
+    if(W>0 && D>0) elA.value=String(Math.round(W*D));
+  } else {
+    ajustarLadosLaje();
+  }
+  calcular();
 }
 /* ============ PLANTAS (situacao + corte) ============
    Geradas do resolver() do momento; a de situacao sempre com o Norte para
@@ -2885,8 +2925,12 @@ if($('fecharPlantas')) $('fecharPlantas').addEventListener('click', ()=>$('telaP
 
 /* inputs numericos comuns: recalculam a cada digito */
 ['pctA','m2Uni','fator','pd','nSub','vagUni','m2Vaga','pctSub','vmt','fp',
- 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase','ovLajeAlvo']
+ 'ovH','ovCab','ovCam','ovLat','ovFun','ovRj','ovConv','ovBase']
   .forEach(id => { const el=$(id); if(el) el.addEventListener('input', calcular); });
+/* laje: área <-> lados ligados pela invariante A = W×D (ver sincronizarLaje) */
+if($('ovLajeAlvo')) $('ovLajeAlvo').addEventListener('input', ()=>sincronizarLaje('area'));
+if($('ovLajeW')) $('ovLajeW').addEventListener('input', ()=>sincronizarLaje('lado'));
+if($('ovLajeD')) $('ovLajeD').addEventListener('input', ()=>sincronizarLaje('lado'));
 /* % da ZOT combinada muda o regime base: reflete nos campos e recalcula */
 $('pctA').addEventListener('input', preencherRegime);
 ['zotB','uso','zocup','rj','usoBase','origParc','alturaMenosRestr','baseIsOn']

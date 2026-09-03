@@ -612,6 +612,45 @@ maior aresta do GRUPO/LADO já escolhido, mantendo a ancoragem por esquina.
 
 ---
 
+## 21. "Laje retangular" gerava quadrado — proporção Largura × Profundidade editável
+O usuário pediu: o botão "Laje retangular" deve deixar a laje **retangular, não
+quadrada**; os lados podem ter dimensões diferentes (contanto que seja um
+quadrilátero); tem que haver **campo para definir cada lado**; e **ao aumentar a
+área, os lados se alteram automaticamente**.
+
+**Causa**: `torreImplantada` sempre começava de um **quadrado** —
+`ajustar` e `fitEm` faziam `W=√alvo, D=alvo/W` (⇒ W=D). Mesmo em modo "laje
+retangular" (`soRetangular`), quando o alvo cabia inteiro o resultado era
+quadrado, porque não havia como expressar uma proporção diferente.
+
+**Correção**:
+- Dois campos novos no painel esquerdo, ao lado da "Laje alvo": **Largura da
+  laje** (`#ovLajeW`) e **Profundidade da laje** (`#ovLajeD`). Largura corre ao
+  longo da testada (`dx`), profundidade é perpendicular (`nx`).
+- Os três campos ficam ligados pela invariante **A = W × D**
+  (`sincronizarLaje`/`ajustarLadosLaje`): editar a **área** reescala os lados
+  mantendo a proporção (o "aumentou a área → os lados se alteram"); editar um
+  **lado** recalcula a área. O clamp de `atualizarLimiteLaje` também reescala os
+  lados ao capar a área.
+- A razão `prop = W/D` (default **1 = quadrado**, mantém o comportamento antigo)
+  entra em `resolver()` como `propLaje` e vira o **12º parâmetro** de
+  `torreImplantada(...,prop)`. `ajustar`/`fitEm` passam a começar de
+  `W=√(alvo·prop)`, `D=√(alvo/prop)` — W·D=alvo, W/D=prop. Só as duas chamadas
+  que MOLDAM a laje (compactação e torre implantada) recebem `propLaje`; a
+  chamada `tiMax` (teto do campo) fica em `prop=1` porque mede capacidade, não
+  forma; a torre natural de envelope cheio não é retângulo e não usa `prop`.
+
+**Teste** (`test_prop_permanente.js`): num lote amplo 80×60, alvo 600 m² nas
+proporções 40×15, 15×40, 50×12 e o quadrado 24,5×24,5 — em todas o retângulo
+obtido bate exatamente a proporção pedida, `area == alvo` (e == shoelace do
+polígono), e o recuo é respeitado em **toda aresta** (amostragem, não só
+vértices). Os 7 core + fallback + fiapo + alinhar + frag + alvo-altura + teto
+seguem passando (as chamadas antigas omitem `prop` ⇒ default 1 ⇒ quadrado, sem
+regressão). **Validação em navegador real fica pendente do lado do usuário**
+(restrição de proxy/Chromium desta sessão, ver CLAUDE.md § Testes).
+
+---
+
 ## Armadilhas recorrentes (não repetir)
 
 - **Duas cópias do HTML** (trabalho × entregável): um `cp` errado reintroduzia

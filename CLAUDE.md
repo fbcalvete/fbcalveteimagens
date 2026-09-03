@@ -143,6 +143,29 @@ natural, e um campo em m² separado só para a torre implantada; unificados
 num só campo depois que o usuário pediu que valesse sempre, mesmo com CA
 sobrando). Reduzir a área ganha recuo e permite subir mais; aumentar exige
 altura menor para caber — o mesmo mecanismo em ambos os casos:
+
+### Proporção da laje — Largura × Profundidade (`#ovLajeW` / `#ovLajeD`)
+
+Dois campos ao lado da laje alvo definem a **proporção do retângulo** alvo:
+**largura (W)** corre ao longo da testada (`dx`), **profundidade (D)** é
+perpendicular (`nx`, para dentro do lote). Os três campos (área, W, D) são
+ligados pela invariante **A = W × D** (`sincronizarLaje`/`ajustarLadosLaje`):
+editar a **área** reescala W e D mantendo a proporção atual (é o
+"quando aumenta a área, os lados se alteram" pedido pelo usuário); editar um
+**lado** recalcula a área (`Math.round(W*D)`). O clamp de `atualizarLimiteLaje`
+também reescala os lados ao capar a área. A razão `prop = W/D` (default **1 =
+quadrado**, o comportamento antigo) é lida em `resolver()` como `propLaje` e
+passada como **12º parâmetro** de `torreImplantada(...,prop)`. Dentro dela,
+`ajustar` e `fitEm` partem de `W=√(alvo·prop)`, `D=√(alvo/prop)` (era sempre
+quadrado — a raiz do "botão Laje retangular gerava quadrado, não retângulo").
+`prop` só molda a laje quando a **torre implantada ou a compactação** entram em
+ação (as duas chamadas de `torreImplantada` em `resolver()` recebem `propLaje`);
+a torre natural que ocupa o envelope inteiro não é retângulo e não usa `prop`.
+A chamada `tiMax` (teto do campo, `maxLajeViavel`) fica com `prop=1` de
+propósito — mede capacidade, não forma. Testado (`test_prop_permanente.js`):
+proporções 40×15, 15×40, 50×12 e o quadrado 24,5×24,5 num lote amplo — em todas
+o retângulo obtido bate a proporção pedida, `area == alvo`, e o recuo é
+respeitado em **toda aresta** (não só vértices).
 - **Torre natural**: `lajeDesejada = alvoLaje`; percorre `curva` (um envelope
   por altura) e escolhe o `nT` mais alto cujo `laje >= lajeDesejada` **e**
   caiba no CA (`cUser`). `best = cUser || alto` — só cai para `alto` (o
@@ -238,6 +261,10 @@ laje compacta (alvo = **laje alvo**, ver seção acima) sempre ancorada na
     `torreImplantada(..., hFixo=best.H)`. Antes só disparava quando a laje
     natural sobrava em relação ao alvo (`best.laje > alvo*1.02`) — por isso o
     botão "não funcionava" em lote onde a laje já era <= alvo (bug real).
+    O retângulo **não é mais forçado a quadrado**: usa a proporção W/D dos
+    campos Largura/Profundidade (`propLaje`, ver seção "Proporção da laje").
+    Antes `ajustar`/`fitEm` começavam sempre quadrados (`√alvo × √alvo`), então
+    o botão gerava um quadrado mesmo com os lados diferentes pedidos (bug real).
   - **`#tgAlinhar`** ("Alinhar frente"): orienta a laje (retangular) pela MAIOR
     TESTADA ÚNICA — a fachada fica paralela à maior frente para logradouro. Passa
     `alinharTestada=true` para `torreImplantada()`, que troca a orientação padrão
