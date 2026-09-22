@@ -41,7 +41,7 @@ Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
 | Ida | uma **sexta-feira**, voo partindo **a partir das 17h** |
 | Volta | a **segunda-feira** seguinte, voo partindo **até ~08h** |
 | Tipo | ida e volta |
-| Horizonte | próximos ~60 dias (varre os fins de semana e pega o mais barato) |
+| Horizonte | ida entre **40 e 140 dias** a partir de hoje (pega o fim de semana mais barato) |
 
 - **Gatilho de alerta:** total ida+volta **< R$ 500**.
 - **No e-mail:** datas exatas (sexta/segunda), preço, companhia, horários e link.

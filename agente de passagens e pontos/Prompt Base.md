@@ -49,8 +49,8 @@ Ida e volta, para **qualquer fim de semana**, desde que seja sempre um par
 **sexta → segunda seguinte** (3 noites):
 - **Ida:** sexta-feira, voo partindo **a partir das 17h**.
 - **Volta:** segunda-feira, voo partindo **até ~08h da manhã**.
-- Varra os próximos fins de semana (sexta→segunda) dentro de um horizonte de
-  ~60 dias e ache o mais barato que respeite esses horários.
+- Varra os fins de semana (sexta→segunda) cuja **ida caia entre 40 e 140 dias a
+  partir de hoje** e ache o mais barato que respeite esses horários.
 - **CRITÉRIO DE ALERTA:** total ida+volta **abaixo de R$ 500,00**.
 - Se qualificar, informe: as **datas exatas** (sexta e segunda), preço, site(s) de
   origem, companhia e horários dos voos, e link(s).

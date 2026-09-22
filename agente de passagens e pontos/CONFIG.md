@@ -19,7 +19,7 @@ Gmail em **claude.ai → Routines → "Agente Aéreo & Pontos (08h/20h BRT)"**.
 - **Passagem Carnaval:** POA↔RIO, ida 04/02/2027, volta 10/02/2027, ida e volta,
   total **< R$ 1.000**.
 - **Fim de semana POA↔CGH:** qualquer par sexta (voo ≥17h) → segunda seguinte
-  (voo até ~08h), horizonte ~60 dias, total **< R$ 500**.
+  (voo até ~08h), ida entre **40 e 140 dias** a partir de hoje, total **< R$ 500**.
 - **Voos:** consultar MaxMilhas + Skyscanner + Google Flights e repassar preços
   (sem travar por "fonte confiável"); usar o menor preço para o critério.
 - **Sem critério satisfeito → nenhum e-mail.**
