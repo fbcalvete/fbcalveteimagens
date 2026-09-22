@@ -30,6 +30,27 @@ Monitora uma passagem específica:
 - **Gatilho de alerta:** total ida+volta **< R$ 1.000**.
 - **No e-mail:** preço encontrado, companhia/horários (se disponível) e o link.
 
+### 3. Fim de semana POA ↔ São Paulo/Congonhas (CGH)
+Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
+**sexta → segunda seguinte** (3 noites):
+
+| Campo | Valor |
+|---|---|
+| Origem | Porto Alegre (POA) |
+| Destino | São Paulo / Congonhas (CGH) |
+| Ida | uma **sexta-feira**, voo partindo **a partir das 17h** |
+| Volta | a **segunda-feira** seguinte, voo partindo **até ~08h** |
+| Tipo | ida e volta |
+| Horizonte | próximos ~60 dias (varre os fins de semana e pega o mais barato) |
+
+- **Gatilho de alerta:** total ida+volta **< R$ 500**.
+- **No e-mail:** datas exatas (sexta/segunda), preço, companhia, horários e link.
+
+### Regra dos voos (Verificações 2 e 3)
+Para passagens, o agente consulta **MaxMilhas, Skyscanner e Google Flights** e
+repassa os preços que encontrar (indicando a fonte) — sem travar por "fonte
+confiável". Usa o menor preço para comparar com o critério.
+
 ## Como está montado
 
 - **Mecanismo:** uma *Routine* (agendamento recorrente do Claude Code) dispara
@@ -38,9 +59,9 @@ Monitora uma passagem específica:
   (UTC−3).
 - **Envio de e-mail:** conector **Gmail** já autenticado na conta, remetente
   `fbcalvete@gmail.com`.
-- **Instruções do agente:** [`agente/PROMPT.md`](agente/PROMPT.md) — é
-  exatamente o texto que a Routine executa a cada disparo.
-- **Detalhes de config e manutenção:** [`agente/CONFIG.md`](agente/CONFIG.md).
+- **Instruções do agente:** [`Prompt Base.md`](agente%20de%20passagens%20e%20pontos/Prompt%20Base.md)
+  — exatamente o texto que a Routine executa a cada disparo.
+- **Detalhes de config e manutenção:** [`CONFIG.md`](agente%20de%20passagens%20e%20pontos/CONFIG.md).
 
 ## Importante saber
 
@@ -48,7 +69,7 @@ Monitora uma passagem específica:
   mandar nada. Você não recebe "relatório de que não há nada".
 - **Enquanto a condição durar, o alerta pode repetir.** Como a verificação é a
   cada 12h, uma promoção que fique dias pagando ≥8 pts/real pode gerar e-mail em
-  cada rodada. Veja em [`CONFIG.md`](agente/CONFIG.md) como reduzir repetição.
+  cada rodada. Veja em [`CONFIG.md`](agente%20de%20passagens%20e%20pontos/CONFIG.md) como reduzir repetição.
 - **MaxMilhas é um site dinâmico.** O preço é carregado via JavaScript; o agente
   tenta ler a página de resultados e, quando não consegue o valor exato, usa
   busca/《fontes alternativas》e só alerta com um preço confiável abaixo de R$1.000.

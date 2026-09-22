@@ -5,31 +5,23 @@
 - **Nome:** `Agente Aéreo & Pontos (08h/20h BRT)`
 - **Disparo:** cria uma sessão nova a cada firing (`create_new_session_on_fire`).
 - **Agenda (cron, UTC):** `0 11,23 * * *` → 08:00 e 20:00 de Brasília (UTC−3).
-- **Prompt executado:** ver [`PROMPT.md`](PROMPT.md) (é o texto standalone da Routine).
+- **Prompt executado:** ver [`Prompt Base.md`](Prompt%20Base.md) (é o texto standalone da Routine).
 
-## ⚠️ Passo manual necessário: anexar o Gmail à Routine
-As sessões disparadas por esta Routine **não herdam automaticamente o conector
-do Gmail** nesta organização — logo, sem o passo abaixo o agente pesquisa mas
-**não envia o e-mail**.
-
-Para habilitar o envio:
-1. Acesse **claude.ai → Settings/Configurações → Routines** (ou a lista de
-   Rotinas/agendamentos).
-2. Abra a rotina **"Agente Aéreo & Pontos (08h/20h BRT)"**.
-3. Em conectores/integrações da rotina, **habilite o Gmail** e salve.
-
-Depois disso, o agente passa a mandar e-mail para `fbcalvete@gmail.com` sempre
-que um critério for satisfeito.
-
-> Alternativa: recriar a rotina diretamente pela interface de Rotinas da
-> claude.ai (colando o prompt de `PROMPT.md`, cron `0 11,23 * * *`) já com o
-> Gmail anexado.
+## Gmail (envio de e-mail) — JÁ CONECTADO ✅
+O conector **Gmail já está anexado à Routine** (`mcp_connections: Gmail`), então
+as sessões disparadas conseguem enviar e-mail para `fbcalvete@gmail.com` quando
+algum critério é satisfeito. Se algum dia o envio parar de funcionar, reanexe o
+Gmail em **claude.ai → Routines → "Agente Aéreo & Pontos (08h/20h BRT)"**.
 
 ## Critérios de alerta
 - **Pontos pra Voar:** alguma loja de varejo/eletro pagando **≥ 8 pontos/real**
   em promoção **vigente**.
-- **MaxMilhas:** passagem POA↔RIO, ida 04/02/2027, volta 10/02/2027, ida e volta,
+- **Passagem Carnaval:** POA↔RIO, ida 04/02/2027, volta 10/02/2027, ida e volta,
   total **< R$ 1.000**.
+- **Fim de semana POA↔CGH:** qualquer par sexta (voo ≥17h) → segunda seguinte
+  (voo até ~08h), horizonte ~60 dias, total **< R$ 500**.
+- **Voos:** consultar MaxMilhas + Skyscanner + Google Flights e repassar preços
+  (sem travar por "fonte confiável"); usar o menor preço para o critério.
 - **Sem critério satisfeito → nenhum e-mail.**
 
 ## Como alterar
@@ -37,7 +29,7 @@ Use as ferramentas de Routine (ou a interface da claude.ai):
 - **Mudar horários:** editar `cron_expression`. Lembre de converter para UTC
   (Brasília = UTC−3; some 3 horas). Ex.: 07:00 e 19:00 BRT → `0 10,22 * * *`.
 - **Mudar critérios/datas/lojas:** editar o `prompt` da Routine **e** o
-  [`PROMPT.md`](PROMPT.md) para manter os dois em sincronia.
+  [`Prompt Base.md`](Prompt%20Base.md) para manter os dois em sincronia.
 - **Pausar:** desabilitar a Routine (`enabled = false`).
 - **Testar agora:** disparar a Routine manualmente (fire) para ver uma rodada.
 
