@@ -57,9 +57,9 @@ Ida e volta, para **qualquer fim de semana**, desde que seja sempre um par
 
 ## Envio do e-mail (somente se a Verificação 1, 2 OU 3 alertar)
 - Ferramenta: Gmail (`send_message`). Para: **fbcalvete@gmail.com**.
-- Assunto: `Alerta de pontos/passagem — <resumo curto>`.
-- Corpo: tom pessoal, começando com "Olá Felipe,", listando todos os itens que
-  bateram o critério, com dados e links. Não invente valores — reporte o que
-  encontrou nas fontes.
+- Assunto: `Alerta — <resumo curto>` (ex.: "Alerta — Casas Bahia 10 pts/real").
+- Corpo: **SUCINTO**. Comece com "Olá Felipe," e liste só o essencial, **uma
+  linha por alerta**: o que bateu, o valor (pontos/real ou preço + datas) e o
+  link. Sem introduções, explicações ou textos de reforço. Não invente valores.
 
 Se nenhuma das três verificações bater o critério, **não envie e-mail**.
