@@ -360,7 +360,24 @@ condicionar o desenho da base à validade do `envB`.
 estampa "API KEY REQUIRED" nas tiles — foi **removida** (o `#map` já tem fundo
 escuro; contexto vem da grade de ZOTs + lotes vetoriais + números, todos do
 ArcGIS aberto). Navegação por chips de bairro + busca de endereço. Não recolocar
-a CARTO; se quiser ruas de fundo, um tileLayer key-free (OSM padrão) no `initMap`.
+a CARTO.
+
+**Nomes de rua no mapa** (`carregarRuasMapa`, camada `camadaRua`, pane `ruas`
+zIndex 440): quando a CARTO saiu, sumiram os nomes de rua que ela desenhava. Em
+vez de voltar com um basemap, os nomes vêm da **camada oficial de eixos**
+(`EIXOS_URL`, campos `nmidelog`/`nmideabr`), a MESMA fonte das ruas de frente das
+plantas — então os nomes batem. Uma consulta por `moveend`, a partir de
+`ZOOM_RUA` (16). Para não poluir, desenha **um rótulo por rua** na janela (o eixo
+mais comprido daquela rua, dedup por nome), no meio do comprimento, girado pela
+direção da via (com correção de Web Mercator no `dy`, `/cos(lat)`, senão o rótulo
+não acompanha a rua na tela; normaliza para nunca ficar de cabeça para baixo).
+Estilo `.rualabel`: cinza claro (`#9aa3b0`), caixa-alta, `letter-spacing`,
+`opacity .85`, com halo preto — sutil, abaixo dos números de porta (pane `num`
+zIndex 450). É um extra silencioso (igual aos números): qualquer erro de fetch é
+engolido para não travar o mapa. **Não testado em navegador real nesta sessão**
+(restrição de proxy/Chromium — ver § Testes); a lógica de ângulo/midpoint foi
+conferida com paths sintéticos (E-O→0°, N-S→90°, diagonal com Mercator,
+oeste→normalizado para cima).
 
 Barra de cima: `#tbMassa`/`#btnPlantas` (troca de visão), `#tgRetangular`
 ("Laje retangular" — força a torre implantada a não deformar, ver seção acima),

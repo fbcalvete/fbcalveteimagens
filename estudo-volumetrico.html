@@ -56,6 +56,15 @@ header .spacer{flex:1}
 .numlote span{font:600 10px/1 'IBM Plex Mono',monospace;color:#e9edf2;
   text-shadow:0 0 2px #000,0 0 2px #000,0 0 3px #000;white-space:nowrap;
   display:inline-block}
+/* nomes de rua no mapa (camada de eixos): cinza claro, sutil, parecido com os
+   numeros de porta mas mais apagado — repoe o que a CARTO mostrava antes de
+   ser removida (ver 3D no CLAUDE.md). */
+.rualabel{background:none!important;border:none!important;pointer-events:none;
+  display:flex;align-items:center;justify-content:center}
+.rualabel span{font:600 9px/1 'IBM Plex Mono',monospace;color:#9aa3b0;
+  letter-spacing:.14em;text-transform:uppercase;opacity:.85;
+  text-shadow:0 0 2px #000,0 0 2px #000,0 0 3px #000;white-space:nowrap;
+  display:inline-block}
 .zsl{display:flex;align-items:center;gap:8px;margin-top:7px;font-family:'IBM Plex Mono',monospace;
   font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
 .zsl input{flex:1;accent-color:var(--bp)}
@@ -1141,6 +1150,7 @@ const ZOOM_VETOR = 17;      /* a partir daqui, lotes vetoriais tingidos por ZOT.
                               Em 16 o Centro chega a 8.000 lotes: baixar toda
                               essa geometria trava; ate 16 vale a grade-imagem. */
 const ZOOM_NUM   = 18;      /* numero de porta aparece so bem de perto */
+const ZOOM_RUA   = 16;      /* nomes de rua (eixos) aparecem a partir daqui */
 
 const BAIRROS = [
   ['Centro Historico',-30.0330,-51.2287], ['Moinhos de Vento',-30.0255,-51.2040],
@@ -1150,7 +1160,7 @@ const BAIRROS = [
   ['Cristal',-30.0870,-51.2280],          ['Tristeza',-30.1160,-51.2540]
 ];
 
-let mapa, camadaLotesVet, camadaSel, camadaZonasImg, camadaNum;
+let mapa, camadaLotesVet, camadaSel, camadaZonasImg, camadaNum, camadaRua;
 let cacheLotes = [], selecionados = [];
 
 /* ---------- grade de zoneamento (uma imagem, indexada por pixel) ---------- */
@@ -1274,6 +1284,8 @@ async function initMap(){
   mapa.createPane('lotesV'); mapa.getPane('lotesV').style.zIndex = 350;
   mapa.createPane('sel');    mapa.getPane('sel').style.zIndex    = 400;
   mapa.createPane('num');    mapa.getPane('num').style.zIndex    = 450;
+  /* nomes de rua: abaixo dos numeros de porta, acima da selecao */
+  mapa.createPane('ruas');   mapa.getPane('ruas').style.zIndex   = 440;
 
   /* NAO usamos os tiles do cadastro como fundo: eles vem 95% beges e
      pintavam a cidade inteira de amarelo. Ate o zoom 16 quem mostra a
@@ -1287,6 +1299,7 @@ async function initMap(){
   camadaSel = L.geoJSON(null, {pane:'sel', style:{color:'#ffffff', weight:2.5,
                                fillColor:'#f2a03d', fillOpacity:.45}}).addTo(mapa);
   camadaNum = L.layerGroup([], {pane:'num'});
+  camadaRua = L.layerGroup([], {pane:'ruas'});
 
   BAIRROS.forEach(b => {
     const bt = document.createElement('button');
@@ -1296,7 +1309,7 @@ async function initMap(){
   });
 
   mapa.on('zoomend', () => { escala(); ajustarCamadas(); agendarLotes(); });
-  mapa.on('moveend', () => { agendarLotes(); carregarNumeros(); });
+  mapa.on('moveend', () => { agendarLotes(); carregarNumeros(); carregarRuasMapa(); });
   mapa.on('click', clicou);
   escala();
 
@@ -1312,6 +1325,7 @@ async function initMap(){
   ajustarCamadas();
   agendarLotes();
   carregarNumeros();
+  carregarRuasMapa();
 }
 
 /* ---------- lotes vetoriais tingidos por ZOT ----------
@@ -1419,6 +1433,10 @@ function ajustarCamadas(){
   const mostrarNum = z >= ZOOM_NUM;
   if(mostrarNum && !mapa.hasLayer(camadaNum)) camadaNum.addTo(mapa);
   if(!mostrarNum && mapa.hasLayer(camadaNum)) camadaNum.remove();
+  /* nomes de rua aparecem um pouco antes dos numeros de porta */
+  const mostrarRua = z >= ZOOM_RUA;
+  if(mostrarRua && !mapa.hasLayer(camadaRua)) camadaRua.addTo(mapa);
+  if(!mostrarRua && mapa.hasLayer(camadaRua)) camadaRua.remove();
 }
 
 /* ---------- numeros de porta (camada nro_imovel da SMAMUS) ----------
@@ -1455,6 +1473,68 @@ async function carregarNumeros(){
     }
   }catch(e){ /* silencioso: numero e um extra, nao pode travar o mapa */ }
   numBusy = false;
+}
+
+/* ---------- nomes de rua no mapa (camada de eixos da SMAMUS) ----------
+   Repoe os rotulos de rua que vinham da CARTO (removida por exigir API key).
+   Uma consulta por movimento, a partir do ZOOM_RUA. Para nao poluir, desenha
+   UM rotulo por rua na janela (o eixo mais comprido daquela rua), no meio do
+   comprimento e girado conforme a direcao da via. Usa a MESMA fonte oficial
+   (nmidelog/nmideabr) e o mesmo tituloRua() das ruas de frente, entao os nomes
+   batem com os das plantas. */
+let ruaBox = '', ruaBusy = false;
+async function carregarRuasMapa(){
+  if(mapa.getZoom() < ZOOM_RUA) return;
+  const b = mapa.getBounds();
+  const box = [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v=>v.toFixed(5)).join(',');
+  if(box === ruaBox || ruaBusy) return;
+  ruaBusy = true; ruaBox = box;
+  try{
+    const r = await fetch(EIXOS_URL + '/query?geometry=' + box
+      + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
+      + '&outFields=nmidelog,nmideabr&outSR=4326&returnGeometry=true&f=geojson'
+      + '&resultRecordCount=1500');
+    const j = await r.json();
+    if(j.error) throw new Error(j.error.message||'erro');
+    /* agrupa por nome, guarda o path MAIS LONGO de cada rua dentro da janela */
+    const porNome = {};
+    const compDe = p => { let c=0; for(let i=0;i+1<p.length;i++) c+=Math.hypot(p[i+1][0]-p[i][0], p[i+1][1]-p[i][1]); return c; };
+    for(const f of (j.features||[])){
+      if(!f.geometry) continue;
+      const nome = f.properties && f.properties.nmidelog;
+      if(!nome) continue;
+      const rotulo = tituloRua(nome, f.properties.nmideabr);
+      const paths = f.geometry.type==='MultiLineString' ? f.geometry.coordinates
+                   : (f.geometry.type==='LineString' ? [f.geometry.coordinates] : []);
+      for(const pth of paths){
+        if(!pth || pth.length < 2) continue;
+        const comp = compDe(pth);
+        if(!porNome[rotulo] || comp > porNome[rotulo].comp) porNome[rotulo] = {comp, pth, rotulo};
+      }
+    }
+    camadaRua.clearLayers();
+    for(const k in porNome){
+      const pth = porNome[k].pth, rotulo = porNome[k].rotulo;
+      /* ponto no meio do comprimento + angulo do segmento que o contem */
+      const total = compDe(pth);
+      let meio = total/2, acc = 0, mx = pth[0][0], my = pth[0][1], dirx = 1, diry = 0;
+      for(let i=0;i+1<pth.length;i++){
+        const dx = pth[i+1][0]-pth[i][0], dy = pth[i+1][1]-pth[i][1], L = Math.hypot(dx,dy);
+        if(acc+L >= meio){ const t = L ? (meio-acc)/L : 0; mx = pth[i][0]+dx*t; my = pth[i][1]+dy*t; dirx = dx; diry = dy; break; }
+        acc += L;
+      }
+      /* dx em lng, dy em lat: corrige a compressao do lng pela latitude
+         (Web Mercator) para o rotulo seguir a rua na tela, nao em graus crus */
+      const sdy = diry / Math.cos(my*Math.PI/180);
+      let ang = Math.atan2(sdy, dirx) * 180/Math.PI;
+      if(ang > 90) ang -= 180; else if(ang < -90) ang += 180;   /* nunca de cabeca pra baixo */
+      L.marker([my,mx], {pane:'ruas', interactive:false, icon:
+        L.divIcon({className:'rualabel',
+                   html:'<span style="transform:rotate('+(-ang)+'deg)">'+rotulo+'</span>',
+                   iconSize:[0,0]})}).addTo(camadaRua);
+    }
+  }catch(e){ /* silencioso: nome de rua e um extra, nao pode travar o mapa */ }
+  ruaBusy = false;
 }
 
 function escala(){
