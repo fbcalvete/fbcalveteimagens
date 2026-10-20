@@ -1150,7 +1150,7 @@ const ZOOM_VETOR = 17;      /* a partir daqui, lotes vetoriais tingidos por ZOT.
                               Em 16 o Centro chega a 8.000 lotes: baixar toda
                               essa geometria trava; ate 16 vale a grade-imagem. */
 const ZOOM_NUM   = 18;      /* numero de porta aparece so bem de perto */
-const ZOOM_RUA   = 16;      /* nomes de rua (eixos) aparecem a partir daqui */
+const ZOOM_RUA   = 18;      /* nomes de rua aparecem junto com os numeros de porta */
 
 const BAIRROS = [
   ['Centro Historico',-30.0330,-51.2287], ['Moinhos de Vento',-30.0255,-51.2040],
@@ -1477,7 +1477,8 @@ async function carregarNumeros(){
 
 /* ---------- nomes de rua no mapa (camada de eixos da SMAMUS) ----------
    Repoe os rotulos de rua que vinham da CARTO (removida por exigir API key).
-   Uma consulta por movimento, a partir do ZOOM_RUA. Para nao poluir, desenha
+   Uma consulta por movimento, a partir do ZOOM_RUA (18, junto com os numeros de
+   porta). Para nao poluir, desenha
    UM rotulo por rua na janela (o eixo mais comprido daquela rua), no meio do
    comprimento e girado conforme a direcao da via. Usa a MESMA fonte oficial
    (nmidelog/nmideabr) e o mesmo tituloRua() das ruas de frente, entao os nomes
@@ -1492,21 +1493,21 @@ async function carregarRuasMapa(){
   try{
     const r = await fetch(EIXOS_URL + '/query?geometry=' + box
       + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'
-      + '&outFields=nmidelog,nmideabr&outSR=4326&returnGeometry=true&f=geojson'
-      + '&resultRecordCount=1500');
+      + '&outFields=nmidelog,nmideabr&outSR=4326&returnGeometry=true&f=json'
+      + '&resultRecordCount=2000');
     const j = await r.json();
     if(j.error) throw new Error(j.error.message||'erro');
-    /* agrupa por nome, guarda o path MAIS LONGO de cada rua dentro da janela */
+    /* agrupa por nome, guarda o path MAIS LONGO de cada rua dentro da janela.
+       Usa f=json + attributes + geometry.paths (mesma forma da camada de eixos
+       usada em carregarRuas() das plantas — o f=geojson nao retorna igual para
+       esta camada, por isso antes nao aparecia nada). */
     const porNome = {};
     const compDe = p => { let c=0; for(let i=0;i+1<p.length;i++) c+=Math.hypot(p[i+1][0]-p[i][0], p[i+1][1]-p[i][1]); return c; };
     for(const f of (j.features||[])){
-      if(!f.geometry) continue;
-      const nome = f.properties && f.properties.nmidelog;
-      if(!nome) continue;
-      const rotulo = tituloRua(nome, f.properties.nmideabr);
-      const paths = f.geometry.type==='MultiLineString' ? f.geometry.coordinates
-                   : (f.geometry.type==='LineString' ? [f.geometry.coordinates] : []);
-      for(const pth of paths){
+      const nome = f.attributes && f.attributes.nmidelog;
+      if(!nome || !nome.trim() || !f.geometry || !f.geometry.paths) continue;
+      const rotulo = tituloRua(nome, f.attributes.nmideabr);
+      for(const pth of f.geometry.paths){
         if(!pth || pth.length < 2) continue;
         const comp = compDe(pth);
         if(!porNome[rotulo] || comp > porNome[rotulo].comp) porNome[rotulo] = {comp, pth, rotulo};

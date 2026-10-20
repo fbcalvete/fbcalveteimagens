@@ -367,10 +367,14 @@ zIndex 440): quando a CARTO saiu, sumiram os nomes de rua que ela desenhava. Em
 vez de voltar com um basemap, os nomes vêm da **camada oficial de eixos**
 (`EIXOS_URL`, campos `nmidelog`/`nmideabr`), a MESMA fonte das ruas de frente das
 plantas — então os nomes batem. Uma consulta por `moveend`, a partir de
-`ZOOM_RUA` (16). Para não poluir, desenha **um rótulo por rua** na janela (o eixo
-mais comprido daquela rua, dedup por nome), no meio do comprimento, girado pela
-direção da via (com correção de Web Mercator no `dy`, `/cos(lat)`, senão o rótulo
-não acompanha a rua na tela; normaliza para nunca ficar de cabeça para baixo).
+`ZOOM_RUA` (**18, o mesmo zoom dos números de porta** — decisão do usuário: os
+nomes de rua devem surgir junto com os números). Usa **`f=json` + `attributes` +
+`geometry.paths`** (igual ao `carregarRuas()` das plantas) — o `f=geojson` NÃO
+retorna igual para esta camada de eixos e por isso a 1ª versão não desenhava nada
+(bug real). Para não poluir, desenha **um rótulo por rua** na janela (o eixo mais
+comprido daquela rua, dedup por nome), no meio do comprimento, girado pela direção
+da via (com correção de Web Mercator no `dy`, `/cos(lat)`, senão o rótulo não
+acompanha a rua na tela; normaliza para nunca ficar de cabeça para baixo).
 Estilo `.rualabel`: cinza claro (`#9aa3b0`), caixa-alta, `letter-spacing`,
 `opacity .85`, com halo preto — sutil, abaixo dos números de porta (pane `num`
 zIndex 450). É um extra silencioso (igual aos números): qualquer erro de fetch é
