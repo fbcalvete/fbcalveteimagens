@@ -12,9 +12,9 @@ Procura promoções **vigentes** de acúmulo de pontos em lojas de varejo e
 eletrodomésticos (Casas Bahia, Ponto, Fast Shop, Magazine Luiza/Magalu, Amazon,
 Mercado Livre, Extra, etc.).
 
-- **Gatilho de alerta:** alguma loja pagando **≥ 8 pontos por real**.
-- **No e-mail:** loja, programa de fidelidade (Livelo, Esfera, Azul Fidelidade,
-  TudoAzul, LATAM Pass, Smiles…), quantos pontos por real e o link da promoção.
+- **Programas válidos:** **somente Livelo e Esfera** (demais programas são ignorados).
+- **Gatilho de alerta:** alguma loja pagando **≥ 8 pontos por real** em Livelo ou Esfera.
+- **No e-mail:** loja, programa (Livelo/Esfera), quantos pontos por real e o link da promoção.
 
 ### 2. Passagem de Carnaval 2027 — site [MaxMilhas](https://www.maxmilhas.com.br)
 Monitora uma passagem específica:

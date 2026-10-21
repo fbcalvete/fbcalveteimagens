@@ -15,7 +15,7 @@ Gmail em **claude.ai → Routines → "Agente Aéreo & Pontos (08h/20h BRT)"**.
 
 ## Critérios de alerta
 - **Pontos pra Voar:** alguma loja de varejo/eletro pagando **≥ 8 pontos/real**
-  em promoção **vigente**.
+  em promoção **vigente**, **somente nos programas Livelo e Esfera**.
 - **Passagem Carnaval:** POA↔RIO, ida 04/02/2027, volta 10/02/2027, ida e volta,
   total **< R$ 1.000**.
 - **Fim de semana POA↔CGH:** qualquer par sexta (voo ≥17h) → segunda seguinte

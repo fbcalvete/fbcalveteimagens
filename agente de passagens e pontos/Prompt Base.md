@@ -25,8 +25,10 @@ anteriores — nunca confie só no título.
 3. Para cada candidata, **ABRA a matéria** e confirme: pontos por real **da loja**
    (manchetes "até X pontos" às vezes falam de outro parceiro), programa, regra
    (ex.: "só assinante de clube") e validade.
-4. **CRITÉRIO:** loja pagando **≥ 8 pontos por real**, vigente hoje. Se a taxa
-   ≥ 8 exigir clube/assinatura, alerte mesmo assim e diga a condição.
+4. **PROGRAMAS VÁLIDOS: SOMENTE Livelo e Esfera.** Ignore promoções de qualquer
+   outro programa (Azul Fidelidade, LATAM Pass, Smiles, etc.), mesmo com taxa alta.
+5. **CRITÉRIO:** loja pagando **≥ 8 pontos por real em Livelo ou Esfera**, vigente
+   hoje. Se a taxa ≥ 8 exigir clube/assinatura, alerte mesmo assim e diga a condição.
 
 ## REGRA DOS VOOS (Verificações 2 e 3)
 - **Datas exatas são obrigatórias.** Só vale preço para as datas pedidas. Preço
@@ -73,7 +75,7 @@ Para não repetir o mesmo alerta a cada 12h:
 - Gmail `send_message`, para **fbcalvete@gmail.com**.
 - Assunto: `Alerta — <resumo curto>` (ex.: "Alerta — Magalu 12 pts/real").
 - Corpo SUCINTO: "Olá Felipe," e **uma linha por alerta**, neste formato:
-  - `PONTOS | <loja> | <programa> | <N> pts/real | até <dd/mm> | <condição, se houver> | <link>`
+  - `PONTOS | <loja> | <Livelo ou Esfera> | <N> pts/real | até <dd/mm> | <condição, se houver> | <link>`
   - `VOO | <ORIG>-<DEST> <dd/mm>–<dd/mm> | R$ <total> | <cia> <horários> | <site> | <link>`
 - Sem introduções nem explicações. Não invente valores.
 
