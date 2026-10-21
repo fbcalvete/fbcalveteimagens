@@ -47,9 +47,15 @@ Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
 - **No e-mail:** datas exatas (sexta/segunda), preço, companhia, horários e link.
 
 ### Regra dos voos (Verificações 2 e 3)
-Para passagens, o agente consulta **MaxMilhas, Skyscanner e Google Flights** e
-repassa os preços que encontrar (indicando a fonte) — sem travar por "fonte
-confiável". Usa o menor preço para comparar com o critério.
+O agente consulta **Google Flights, Kayak, Skyscanner** (links montados com as
+datas exatas) e, se falharem, **MaxMilhas/Decolar**. Usa o menor total
+ida+volta para comparar com o critério. **Só alerta com preço das datas
+exatas** — preço de outras datas não conta.
+
+### Anti-repetição
+Antes de enviar, o agente lê no Gmail os alertas dos últimos 7 dias e descarta
+o que já foi avisado. Só reenvia se a oferta **melhorar** (mais pontos/real ou
+preço pelo menos R$ 30 menor).
 
 ## Como está montado
 
@@ -67,9 +73,7 @@ confiável". Usa o menor preço para comparar com o critério.
 
 - **Sem novidade = sem e-mail.** Se nada bater o critério, o agente encerra sem
   mandar nada. Você não recebe "relatório de que não há nada".
-- **Enquanto a condição durar, o alerta pode repetir.** Como a verificação é a
-  cada 12h, uma promoção que fique dias pagando ≥8 pts/real pode gerar e-mail em
-  cada rodada. Veja em [`CONFIG.md`](agente%20de%20passagens%20e%20pontos/CONFIG.md) como reduzir repetição.
-- **MaxMilhas é um site dinâmico.** O preço é carregado via JavaScript; o agente
-  tenta ler a página de resultados e, quando não consegue o valor exato, usa
-  busca/《fontes alternativas》e só alerta com um preço confiável abaixo de R$1.000.
+- **Sem repetição.** O mesmo alerta não chega duas vezes em 7 dias, a menos que
+  a oferta melhore.
+- **Sites de passagem são dinâmicos.** Quando nenhum site devolve o preço da
+  data exata, o agente não alerta naquela rodada (prefere silêncio a alarme falso).

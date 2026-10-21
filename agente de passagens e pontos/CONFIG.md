@@ -20,8 +20,8 @@ Gmail em **claude.ai → Routines → "Agente Aéreo & Pontos (08h/20h BRT)"**.
   total **< R$ 1.000**.
 - **Fim de semana POA↔CGH:** qualquer par sexta (voo ≥17h) → segunda seguinte
   (voo até ~08h), ida entre **40 e 140 dias** a partir de hoje, total **< R$ 500**.
-- **Voos:** consultar MaxMilhas + Skyscanner + Google Flights e repassar preços
-  (sem travar por "fonte confiável"); usar o menor preço para o critério.
+- **Voos:** Google Flights → Kayak → Skyscanner → MaxMilhas/Decolar, com links
+  nas datas exatas; menor total ida+volta; preço de outras datas não alerta.
 - **Sem critério satisfeito → nenhum e-mail.**
 
 ## Como alterar
@@ -33,10 +33,9 @@ Use as ferramentas de Routine (ou a interface da claude.ai):
 - **Pausar:** desabilitar a Routine (`enabled = false`).
 - **Testar agora:** disparar a Routine manualmente (fire) para ver uma rodada.
 
-## Reduzir e-mails repetidos (opcional)
-Como a checagem é a cada 12h, uma promoção que fique dias ≥8 pts/real pode gerar
-alerta em toda rodada. Para evitar, seria preciso o agente guardar estado entre
-execuções (ex.: só alertar quando uma condição *nova* aparecer). Cada firing é
-uma sessão limpa e sem memória, então isso exigiria uma fonte de estado externa
-(um arquivo no repositório, uma planilha, etc.). Não implementado por padrão —
-peça se quiser.
+## Anti-repetição (implementado)
+O Gmail é usado como memória: antes de enviar, o agente busca
+`to:fbcalvete@gmail.com subject:Alerta newer_than:7d` e descarta alertas já
+enviados com a mesma chave (pontos: loja + programa + pts/real + validade; voo:
+rota + datas, salvo se o preço cair ≥ R$ 30). Para mudar a janela, troque
+`newer_than:7d` no prompt.
