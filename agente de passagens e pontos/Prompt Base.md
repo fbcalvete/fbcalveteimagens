@@ -31,17 +31,24 @@ anteriores — nunca confie só no título.
    hoje. Se a taxa ≥ 8 exigir clube/assinatura, alerte mesmo assim e diga a condição.
 
 ## REGRA DOS VOOS (Verificações 2 e 3)
-- **Datas exatas são obrigatórias.** Só vale preço para as datas pedidas. Preço
-  de outras datas ou "a partir de" genérico **não** dispara alerta.
-- Consulte, nesta ordem, até obter preço para a data exata (use `WebFetch` nos
-  links montados; se um site não carregar, passe para o próximo — não trave):
+- **Aceite preços não confirmados.** O Felipe confirma manualmente antes de
+  comprar. Não descarte preço por falta de confirmação, e não trave por
+  "fonte confiável". Só não invente valor: todo preço precisa vir de uma fonte
+  real (site, página de resultado, snippet de busca, matéria de promoção).
+- Fontes, nesta ordem (se uma não carregar, passe para a próxima):
   1. Google Flights: `https://www.google.com/travel/flights?q=Flights%20from%20<ORIG>%20to%20<DEST>%20on%20<AAAA-MM-DD>%20through%20<AAAA-MM-DD>&curr=BRL&hl=pt-BR`
   2. Kayak: `https://www.kayak.com.br/flights/<ORIG>-<DEST>/<AAAA-MM-DD>/<AAAA-MM-DD>?sort=price_a`
+     e a página da rota (`https://www.kayak.com.br/voos/<cidade-ORIG>/<cidade-DEST>`).
   3. Skyscanner: `https://www.skyscanner.com.br/transporte/passagens-aereas/<orig>/<dest>/<AAMMDD>/<AAMMDD>/`
-  4. MaxMilhas (https://www.maxmilhas.com.br) e Decolar, se os anteriores falharem.
-  5. Último recurso: `WebSearch` com rota + datas exatas.
-- Repasse o **menor total ida+volta por adulto** encontrado, dizendo o site.
-  Não invente valor; se nenhum site der preço da data exata, não alerte.
+  4. MaxMilhas, Decolar, 123milhas, sites das cias (GOL, LATAM, Azul).
+  5. `WebSearch` com rota + datas/mês e blogs de promoção (Melhores Destinos,
+     Passagens Imperdíveis, Pontos pra Voar).
+- Use o **menor total ida+volta por adulto** encontrado. Se a fonte só der
+  preço de um trecho, de datas próximas ou "a partir de", **alerte mesmo assim**
+  quando bater o critério, e marque o nível de confirmação:
+  - `[confirmado]`: preço da data exata, com horário quando aplicável.
+  - `[a confirmar]`: preço de data próxima, só ida, "a partir de", horário
+    desconhecido ou fonte indireta. Diga em poucas palavras o que falta conferir.
 
 ## Verificação 2 — Carnaval 2027 (POA ↔ Rio)
 - Ida e volta: **POA → RIO** (GIG ou SDU; no Google Flights/Kayak use `RIO`;
@@ -54,11 +61,11 @@ anteriores — nunca confie só no título.
 - Horários: ida na sexta com partida **≥ 17h**; volta na segunda com partida
   **≤ 08h**.
 - Método: liste todas as sextas da janela (~14). Comece pelo calendário/gráfico
-  de preços do Google Flights para a rota e priorize as datas mais baratas;
-  depois consulte as datas exatas (pelo menos as 5 mais promissoras) e confira
-  os horários. Se só achar preço sem horário, só alerte quando conseguir
-  confirmar os horários.
-- **CRITÉRIO:** total ida+volta **< R$ 500,00** respeitando os horários.
+  de preços do Google Flights/Kayak para a rota e priorize as datas mais
+  baratas; depois tente as datas exatas (pelo menos as 5 mais promissoras) e os
+  horários. Se não achar horário, alerte assim mesmo como `[a confirmar]`.
+- **CRITÉRIO:** total ida+volta **< R$ 500,00** (horários desejados; se não
+  confirmados, marque `[a confirmar]`).
 
 ## Deduplicação (antes de enviar)
 Para não repetir o mesmo alerta a cada 12h:
@@ -76,8 +83,8 @@ Para não repetir o mesmo alerta a cada 12h:
 - Assunto: `Alerta — <resumo curto>` (ex.: "Alerta — Magalu 12 pts/real").
 - Corpo SUCINTO: "Olá Felipe," e **uma linha por alerta**, neste formato:
   - `PONTOS | <loja> | <Livelo ou Esfera> | <N> pts/real | até <dd/mm> | <condição, se houver> | <link>`
-  - `VOO | <ORIG>-<DEST> <dd/mm>–<dd/mm> | R$ <total> | <cia> <horários> | <site> | <link>`
-- Sem introduções nem explicações. Não invente valores.
+  - `VOO [confirmado|a confirmar] | <ORIG>-<DEST> <dd/mm>–<dd/mm> | R$ <total> | <cia> <horários ou "horário ?"> | <site> | <link> | <o que conferir, se a confirmar>`
+- Sem introduções nem explicações. Não invente valores (todo preço precisa ter fonte).
 
 Ao final, responda na sessão com um resumo de 3 linhas (uma por verificação),
 incluindo o menor preço achado e se foi descartado por deduplicação.

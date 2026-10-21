@@ -20,8 +20,9 @@ Gmail em **claude.ai → Routines → "Agente Aéreo & Pontos (08h/20h BRT)"**.
   total **< R$ 1.000**.
 - **Fim de semana POA↔CGH:** qualquer par sexta (voo ≥17h) → segunda seguinte
   (voo até ~08h), ida entre **40 e 140 dias** a partir de hoje, total **< R$ 500**.
-- **Voos:** Google Flights → Kayak → Skyscanner → MaxMilhas/Decolar, com links
-  nas datas exatas; menor total ida+volta; preço de outras datas não alerta.
+- **Voos:** Google Flights → Kayak → Skyscanner → MaxMilhas/Decolar/cias/blogs;
+  menor total ida+volta. Aceita preço não confirmado (marca `[a confirmar]`);
+  a confirmação final é manual.
 - **Sem critério satisfeito → nenhum e-mail.**
 
 ## Como alterar

@@ -47,10 +47,11 @@ Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
 - **No e-mail:** datas exatas (sexta/segunda), preço, companhia, horários e link.
 
 ### Regra dos voos (Verificações 2 e 3)
-O agente consulta **Google Flights, Kayak, Skyscanner** (links montados com as
-datas exatas) e, se falharem, **MaxMilhas/Decolar**. Usa o menor total
-ida+volta para comparar com o critério. **Só alerta com preço das datas
-exatas** — preço de outras datas não conta.
+O agente consulta Google Flights, Kayak, Skyscanner, MaxMilhas/Decolar, sites
+das cias e blogs de promoção, e usa o menor total ida+volta. **Aceita preços não
+confirmados** (data próxima, "a partir de", horário desconhecido): alerta assim
+mesmo, marcando `[a confirmar]` e dizendo o que conferir. **A confirmação final é
+manual.** Preços da data exata vêm marcados `[confirmado]`.
 
 ### Anti-repetição
 Antes de enviar, o agente lê no Gmail os alertas dos últimos 7 dias e descarta
@@ -75,5 +76,6 @@ preço pelo menos R$ 30 menor).
   mandar nada. Você não recebe "relatório de que não há nada".
 - **Sem repetição.** O mesmo alerta não chega duas vezes em 7 dias, a menos que
   a oferta melhore.
-- **Sites de passagem são dinâmicos.** Quando nenhum site devolve o preço da
-  data exata, o agente não alerta naquela rodada (prefere silêncio a alarme falso).
+- **Alertas de voo podem vir "a confirmar".** Os sites de passagem são dinâmicos;
+  o agente prefere avisar com um preço indicativo a ficar em silêncio. Confira
+  no link antes de comprar.
