@@ -38,17 +38,28 @@ anteriores — nunca confie só no título.
 - Fontes, nesta ordem (se uma não carregar, passe para a próxima):
   1. Google Flights: `https://www.google.com/travel/flights?q=Flights%20from%20<ORIG>%20to%20<DEST>%20on%20<AAAA-MM-DD>%20through%20<AAAA-MM-DD>&curr=BRL&hl=pt-BR`
   2. Kayak: `https://www.kayak.com.br/flights/<ORIG>-<DEST>/<AAAA-MM-DD>/<AAAA-MM-DD>?sort=price_a`
-     e a página da rota (`https://www.kayak.com.br/voos/<cidade-ORIG>/<cidade-DEST>`).
   3. Skyscanner: `https://www.skyscanner.com.br/transporte/passagens-aereas/<orig>/<dest>/<AAMMDD>/<AAMMDD>/`
   4. MaxMilhas, Decolar, 123milhas, sites das cias (GOL, LATAM, Azul).
-  5. `WebSearch` com rota + datas/mês e blogs de promoção (Melhores Destinos,
-     Passagens Imperdíveis, Pontos pra Voar).
-- Use o **menor total ida+volta por adulto** encontrado. Se a fonte só der
-  preço de um trecho, de datas próximas ou "a partir de", **alerte mesmo assim**
-  quando bater o critério, e marque o nível de confirmação:
-  - `[confirmado]`: preço da data exata, com horário quando aplicável.
-  - `[a confirmar]`: preço de data próxima, só ida, "a partir de", horário
-    desconhecido ou fonte indireta. Diga em poucas palavras o que falta conferir.
+  5. `WebSearch` com rota + datas exatas e blogs de promoção (Melhores Destinos,
+     Passagens Imperdíveis) — só se a promoção citar as datas pedidas.
+- **O preço precisa estar amarrado às datas pedidas.** Aceite sem confirmação
+  de horário, cia ou disponibilidade, mas só se a fonte mostrar o preço para
+  aquele par de datas (ou a soma dos dois trechos, cada um na data certa).
+- **NÃO vale (descarte, não alerte):**
+  - página genérica da rota ("passagens POA → Rio a partir de R$ X"), como as
+    páginas de rota de Momondo, Viajanet, Kayak e Decolar;
+  - preço médio ou mínimo "do mês" ou "de fevereiro";
+  - outro par de datas (ex.: volta em 12/02 quando o pedido é 10/02);
+  - preço de só um trecho apresentado como ida e volta.
+  Esses preços quase sempre são de datas fora de pico e não valem para
+  Carnaval ou para sexta à noite/segunda cedo.
+- Use o **menor total ida+volta por adulto** que passar nessa regra e marque:
+  - `[confirmado]`: data exata + horário conferido (quando aplicável).
+  - `[a confirmar]`: data exata, mas sem horário/cia ou vindo de snippet/fonte
+    indireta. Diga em poucas palavras o que falta conferir.
+- **Link do alerta:** sempre o link da busca já com as datas exatas (o link do
+  Google Flights ou do Kayak montado acima), para o Felipe conferir com 1 clique.
+  Se o preço veio de outra fonte, coloque os dois links.
 
 ## Verificação 2 — Carnaval 2027 (POA ↔ Rio)
 - Ida e volta: **POA → RIO** (GIG ou SDU; no Google Flights/Kayak use `RIO`;
