@@ -18,6 +18,22 @@ DADOS = os.path.join(HERE, '..', 'dados')
 OUT = sys.argv[1]
 CORES = json.load(open(os.path.join(HERE, 'cores.json'), encoding='utf-8'))
 CINZA = '#b9bcc6'
+EF_ANT, EF_NOVO = 1.2, 0.8   # eficiencia de projeto (mesma do build_gis)
+
+
+def ramp(anch, v):
+    if v <= anch[0][0]:
+        return anch[0][1]
+    for (v0, c0), (v1, c1) in zip(anch, anch[1:]):
+        if v <= v1:
+            t = (v - v0) / (v1 - v0)
+            a, b = [int(c0[i:i + 2], 16) for i in (1, 3, 5)], [int(c1[i:i + 2], 16) for i in (1, 3, 5)]
+            return '#' + ''.join(f'{round(x + (y - x) * t):02x}' for x, y in zip(a, b))
+    return anch[-1][1]
+
+
+def ok(v):
+    return v is not None and not (isinstance(v, float) and np.isnan(v)) and v > 0
 
 
 def kcolor(hexc, alpha):
@@ -82,36 +98,41 @@ def placemark(name, sid, desc, geom, visible):
 old = simp(gpd.read_file(os.path.join(DADOS, 'pddua_antigo_zonas.gpkg')))
 items = []
 for r in old.itertuples():
-    sid = style('zu_' + str(r.ativ_cod).replace('.', '_'), CORES['zu'].get(r.ativ_cod, CINZA))
+    sid = style(f'ia_{r.ia_bas}'.replace('.', '_'), ramp(CORES['priv'], r.ia_bas * EF_ANT) if ok(r.ia_bas) else CINZA)
     desc = table([('Zona de uso', fmt(r.zona_uso)), ('MZ · UEU · subunidade', f'{r.mz} · {r.ueu} · {r.subunid}'),
                   ('D-A-I-V', f'{r.dens_cod}-{r.ativ_cod}-{r.ia_cod}-{r.vol_cod}'),
                   ('IA básico / máximo', f'{fmt(r.ia_bas)} / {fmt(r.ia_max)}'),
                   ('CA equivalente (×1,5)', f'{fmt(r.caeq_bas)} / {fmt(r.caeq_max)}'),
                   ('Altura máxima', fmt(r.alt_max, ' m') if r.alt_max == r.alt_max and r.alt_max is not None else fmt(r.alt_txt)),
                   ('Taxa de ocupação', fmt(r.tx_ocup))])
-    items.append(placemark(r.zona_uso, sid, desc, r.geometry, False))
-folder('Plano antigo · PDDUA (LC 434/99)', items, False)
+    items.append(placemark(f'IA {fmt(r.ia_bas)} · {r.zona_uso}', sid, desc, r.geometry, False))
+folder('Plano antigo · PDDUA · cor pelo IA básico', items, False)
 
 new = simp(gpd.read_file(os.path.join(DADOS, 'pdus_novo_zonas.gpkg')))
 items = []
 for r in new.itertuples():
-    sid = style('zot_' + ''.join(c if c.isalnum() else '_' for c in r.zot), CORES['zot'].get(r.zot, CINZA))
+    sid = style(f'ca_{r.ca_bas}'.replace('.', '_'), ramp(CORES['priv'], r.ca_bas * EF_NOVO) if ok(r.ca_bas) else CINZA)
     desc = table([('ZOT', fmt(r.zot)), ('Ocupação', fmt(r.ocupacao)), ('CA básico / máximo', f'{fmt(r.ca_bas_txt)} / {fmt(r.ca_max_txt)}'),
                   ('Altura máxima', fmt(r.alt_txt, ' m')), ('Lote mínimo', fmt(r.lote_min, ' m²')),
                   ('Bairro · setor', f'{fmt(r.bairro)} · {fmt(r.setor)}'), ('ZOT no projeto pós-audiência', fmt(r.zot_projeto))])
-    items.append(placemark(r.zot, sid, desc, r.geometry, True))
-folder('Plano novo · LUOS sancionada (2026)', items, True)
+    items.append(placemark(f'CA {fmt(r.ca_bas_txt)} · {r.zot}', sid, desc, r.geometry, False))
+folder('Plano novo · LUOS 2026 · cor pelo CA básico', items, False)
 
 ov = simp(gpd.read_file(os.path.join(DADOS, 'dinamica_sobreposicao.gpkg')))
 items = []
 for r in ov.itertuples():
-    sid = style('din_' + r.din_camax.replace(' ', '_').replace('ã', 'a'), CORES['dinamica'][r.din_camax], 0xb0)
-    desc = table([('CA máximo', f'{fmt(r.caeq_max)} → {fmt(r.ca_max)} ({fmt(r.d_ca_max)})'),
-                  ('CA básico', f'{fmt(r.caeq_bas)} → {fmt(r.ca_bas)} ({fmt(r.d_ca_bas)})'),
+    g = r.ganho_bas
+    has = g == g and g is not None
+    sid = style(f'g_{round(g)}'.replace('-', 'm') if has else 'g_sem', ramp(CORES['ganho'], g) if has else CINZA, 0xc0)
+    nome = (f'{"+" if g > 0 else ""}{fmt(g)}%' if has else 'Sem comparação') + f' · IA {fmt(r.ia_bas)} → CA {fmt(r.ca_bas)}'
+    desc = table([('Ganho de área privativa (básico)', f'{"+" if has and g > 0 else ""}{fmt(g)}%' if has else 'sem comparação'),
+                  ('IA anterior → CA futuro', f'{fmt(r.ia_bas)} → {fmt(r.ca_bas)}'),
+                  ('Área privativa por m² de terreno', f'{fmt(r.priv_ant)} → {fmt(r.priv_novo)}'),
+                  ('Ganho com o potencial máximo', f'{fmt(r.ganho_max)}%'),
                   ('Altura', f'{fmt(r.alt_ant, " m")} → {fmt(r.alt_novo, " m")}'),
                   ('Antigo', fmt(r.zona_uso)), ('Novo', fmt(r.zot))])
-    items.append(placemark(f'{r.din_camax}: {r.zona_uso} → {r.zot}', sid, desc, r.geometry, False))
-folder('Dinâmica · CA máximo (novo − antigo equivalente)', items, False)
+    items.append(placemark(nome, sid, desc, r.geometry, True))
+folder('Dinâmica · ganho de área privativa (CA × 0,8 ÷ IA × 1,2 − 1)', items, True)
 
 kml = ('<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
        '<name>Planos Diretores de Porto Alegre</name>'

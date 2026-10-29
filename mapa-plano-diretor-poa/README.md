@@ -5,7 +5,7 @@ Comparação, terreno a terreno, entre o **plano antigo (PDDUA, LC 434/99)** e o
 
 - um mapa HTML que roda sozinho;
 - os GIS de cada plano em arquivos independentes;
-- um GIS da sobreposição, com a dinâmica de cada área (ampliou / manteve / reduziu o potencial construtivo).
+- um GIS da sobreposição, com o **ganho de área privativa** de cada área: (CA básico × 0,8) ÷ (IA × 1,2) − 1.
 
 Dados extraídos em **29/10/2026** dos serviços oficiais da Prefeitura.
 
@@ -13,7 +13,7 @@ Dados extraídos em **29/10/2026** dos serviços oficiais da Prefeitura.
 
 Abra `mapa_planos_diretores_poa.html` com duplo clique (Chrome, Edge, Firefox ou Safari).
 
-- **Funciona offline.** Geometria, base de ruas oficial, numeração predial e a biblioteca de mapa estão dentro do arquivo (6,3 MB).
+- **Funciona offline.** Geometria, base de ruas oficial, numeração predial e a biblioteca de mapa estão dentro do arquivo (6,4 MB).
 - **Sem satélite.** O fundo é a malha de logradouros da Prefeitura. Com internet, dá para ligar por baixo um mapa de ruas da CARTO.
 
 ### Como consultar um terreno
@@ -22,14 +22,14 @@ Abra `mapa_planos_diretores_poa.html` com duplo clique (Chrome, Edge, Firefox ou
 2. O painel mostra, para aquele ponto:
    - **Plano antigo:**
      - zona de uso, MZ/UEU/subunidade e código D·A·I·V;
-     - IA básico e máximo, CA equivalente, solo criado/TPC, quota ideal;
+     - IA básico e máximo, área privativa potencial (IA × 1,2), solo criado/TPC, quota ideal;
      - altura máxima, altura na divisa e na base, taxa de ocupação.
    - **Plano novo:**
      - ZOT e tipo de ocupação;
-     - CA básico e máximo, altura máxima, lote mínimo, permeabilidade, recuo de jardim;
+     - CA básico e máximo, área privativa potencial (CA × 0,8), altura máxima, lote mínimo, permeabilidade, recuo de jardim;
      - caracterização e finalidade da zona;
      - a ZOT que o ponto tinha no projeto pós-audiência, quando mudou.
-   - **Dinâmica:** Δ CA básico, Δ CA máximo e Δ altura, com a classificação ampliou / manteve / reduziu.
+   - **Ganho de área privativa** com o potencial básico, com a conta aberta, por exemplo `(CA 2,0 × 0,8) ÷ (IA 1,0 × 1,2) − 1 = +33%`. Mostra também o ganho com o potencial máximo e a diferença de altura.
 3. **Copiar resumo** gera um texto pronto para colar na planilha de estudo.
 
 ### Camadas e cores
@@ -39,9 +39,11 @@ Abra `mapa_planos_diretores_poa.html` com duplo clique (Chrome, Edge, Firefox ou
 | Plano antigo / Plano novo / Dinâmica | Liga e desliga cada mancha. Analise separado ou em conjunto. |
 | Contorno | Mostra só o limite das zonas, para ver um plano sobre o outro. |
 | Barra de opacidade | Transparência de cada camada. |
-| Colorir os planos por | **Zona** (cada plano com sua legenda), **CA máximo**, **CA básico** ou **Altura**. CA e altura usam a mesma escala nos dois planos, para comparação visual direta. |
-| Colorir a dinâmica por | Δ CA máximo, Δ CA básico, Δ altura ou classe (ampliou/reduziu). |
-| Passar o mouse | Mostra, ao mesmo tempo, a zona antiga e a nova sob o cursor. |
+| Cores dos planos | Plano antigo pelo **IA básico**, plano novo pelo **CA básico**. Os dois usam a mesma escala de área privativa por m² de terreno, então a mesma cor indica a mesma área privativa. Exemplo: IA 1,3 (1,56) e CA 2,0 (1,60). |
+| Cores da dinâmica | Ganho de área privativa com as **cores da tabela IA × CA do estudo**, do vermelho (−44% ou menos) ao verde-escuro (+140% ou mais). |
+| Eficiência de projeto | Campos editáveis (padrão 1,2 e 0,8). Ao mudar, o mapa, a matriz e a consulta são recalculados. |
+| Matriz IA × CA | Mostra todas as combinações reais, com o ganho e a área. Clique numa célula para ver no mapa só aquela combinação. |
+| Passar o mouse | Mostra o **ganho percentual**, o **IA anterior** e o **CA futuro** sob o cursor. |
 
 A busca por endereço segue esta ordem:
 
@@ -60,7 +62,7 @@ O painel informa qual dos três casos ocorreu.
 | `dados/pdus_novo_zonas.gpkg` / `.geojson` | **GIS do plano novo:** 8.414 polígonos de ZOT da LUOS sancionada, com o regime de cada ZOT. |
 | `dados/dinamica_sobreposicao.gpkg` / `.geojson` | **GIS sobreposto:** 12.516 peças da interseção antigo × novo, com atributos dos dois planos, deltas e classes. |
 | `dados/planos_diretores_poa.kmz` | As 3 camadas para o **Google Earth**, com cores por zona e ficha em cada polígono. |
-| `dados/tabelas/*.csv` | Anexos 5.1, 6 e 7.1 do PDDUA, regime por ZOT e **dinâmica por bairro**. |
+| `dados/tabelas/*.csv` | Anexos 5.1, 6 e 7.1 do PDDUA, regime por ZOT, **matriz IA × CA básico** (`matriz_ia_ca_basico.csv`) e **dinâmica por bairro**. |
 | `dados/fontes_originais/` | Cópia comprimida dos dados brutos baixados, com URLs e horário (`fontes.json`). |
 | `scripts/` | Download, processamento e geração do HTML/KMZ (reprodutível). |
 
@@ -97,6 +99,9 @@ Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Ma
 
 | Campo | Significado |
 |---|---|
+| `priv_ant`, `priv_novo` | Área privativa potencial por m² de terreno: IA × 1,2 e CA × 0,8. |
+| `ganho_bas` | Ganho de área privativa com o potencial básico, em %: (CA × 0,8) ÷ (IA × 1,2) − 1. |
+| `ganho_max` | O mesmo cálculo com IA máximo e CA máximo. |
 | `d_ca_bas`, `d_ca_max` | CA novo − CA equivalente antigo. |
 | `d_alt` | Altura nova − altura antiga (m). |
 | `r_ca_max` | Razão novo/antigo do CA máximo. |
@@ -117,7 +122,11 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
 ## 4. Método
 
-- **CA equivalente.** O CA do plano novo soma áreas adensáveis e não adensáveis. O IA do PDDUA conta só as adensáveis. Para comparar, `CA equivalente = IA × 1,5`, a mesma regra que a SMAMUS usa no comparativo oficial (campos `ia_b_atual` e `ia_m_atual` da base municipal; conferido, por exemplo IA 1,9 → 2,85).
+- **Área privativa potencial.** A base de cálculo muda entre os planos. O IA do PDDUA conta só áreas adensáveis; o CA novo soma adensáveis e não adensáveis. Por isso cada coeficiente leva uma eficiência de projeto:
+  - plano antigo: `IA × 1,2`;
+  - plano novo: `CA × 0,8`;
+  - `ganho = (CA × 0,8) ÷ (IA × 1,2) − 1`.
+- **Equivalência com a regra oficial.** 1,2 ÷ 0,8 = 1,5, a mesma equivalência que a SMAMUS usa no comparativo oficial (`CA equivalente = IA × 1,5`, campos `ia_b_atual` e `ia_m_atual` da base municipal). Os campos `caeq_*` e `d_ca_*` seguem essa regra.
 - **Classes.** Diferenças de até ±0,05 no CA ou ±0,5 m na altura contam como **Manteve**.
 - **CA máximo sem acréscimo.** Quando o CA máximo novo é "Não se aplica" ou "Ajuste/TDC", ele é tratado como igual ao básico.
 - **Regime por ZOT.** Vem do Anexo 5, apenas dos quarteirões em que a zona antes e depois das emendas é a mesma. Nas linhas alteradas por emenda, a base oficial ainda traz o regime da zona anterior.
@@ -126,34 +135,54 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
 ## 5. Leitura rápida dos resultados
 
-Área de quarteirões comparáveis, pelo CA máximo:
+### Combinações de IA × CA básico que existem na cidade
 
-| Resultado | Área |
-|---|---|
-| Ampliou | 250,5 km² |
-| Manteve | 16,2 km² |
-| Reduziu | 13,7 km² |
-| Sem comparação | 137,2 km² (regime próprio, áreas especiais, zona rural) |
+**IA do plano antigo (Anexo 6):** 0,1 · 0,2 · 0,5 · 0,65 · 1,0 · 1,3 · 1,6 · 1,9 · 2,4. Os códigos 23, 25, 39, 41 e 999 não têm valor numérico (regime próprio, EVU ou lei específica).
 
-Pelo **CA básico**, 19,7 km² reduziram. Pela **altura**, 81,4 km² ampliaram e 8,6 km² reduziram.
+**CA básico do plano novo:** 0,3 · 0,5 · 1,15 · 1,5 · 2,0 · 2,4 · 3,6. Especial, Zona Rural, polígono vetado e ZOT 08.3-D não têm valor numérico.
 
-**Maior ampliação média do CA máximo:** Farrapos (+3,6), Humaitá (+3,5), Centro Histórico (+3,4), Independência (+3,3), São Geraldo (+3,2), Floresta (+3,1) e Navegantes (+3,0). É o eixo 4º Distrito / Centro.
+**CA 3,0 não existe como CA básico.** É o CA **máximo** das ZOT 02 e 03.
 
-**Mais área com redução do CA máximo:**
+Ganho de área privativa e área de quarteirões em cada combinação (km²):
 
-| Bairro | Área do bairro com redução |
-|---|---|
-| Camaquã | 55% |
-| Cavalhada | 43% |
-| Glória | 38% |
-| Tristeza | 33% |
-| Rubem Berta | 22% |
-| Medianeira | 20% |
-| Menino Deus | 17% |
+| IA \ CA | 0,3 | 0,5 | 1,5 | 2,0 | 2,4 | 3,6 |
+|---|---|---|---|---|---|---|
+| **0,1** | +100% · 103,5 | +233% · 5,7 | +900% · 9,0 | +1.233% · 0,6 | +1.500% · 0,05 | |
+| **0,2** | 0% · 3,0 | +67% · 11,5 | +400% · 8,0 | +567% · 0,5 | | |
+| **0,5** | −60% · <0,01 | −33% · 3,3 | +100% · 0,4 | +167% · <0,01 | | |
+| **0,65** | | | | | +146% · 0,1 | |
+| **1,0** | −80% · 0,8 | −67% · 0,8 | 0% · 11,2 | **+33% · 19,4** | +60% · 1,4 | +140% · 0,3 |
+| **1,3** | −85% · 0,9 | −74% · 0,03 | −23% · 4,5 | **+3% · 20,4** | **+23% · 46,8** | +85% · 6,4 |
+| **1,6** | −88% · 0,01 | | −38% · <0,01 | −17% · 0,1 | **0% · 9,6** | +50% · 0,5 |
+| **1,9** | | | | | **−16% · 8,0** | +26% · 1,2 |
+| **2,4** | | | | | −33% · 1,4 | 0% · 1,2 |
 
-Em Menino Deus e Santa Cecília o CA **máximo** sobe, mas o **básico** cai em parte das quadras. Ou seja, há mais potencial, porém mais dele passa a ser **oneroso**.
+A coluna CA 1,15 (ZOT 08.1-F) só ocorre sobre IA não numérico, por isso não aparece na tabela.
 
-A tabela completa está em `dados/tabelas/dinamica_por_bairro.csv`.
+### O que os números dizem
+
+- **Cidade consolidada (IA ≥ 1,0, 135 km²).** A área privativa potencial básica cresce **13% no agregado**:
+  - 16 km² perdem mais de 5%;
+  - 42 km² ficam praticamente iguais (±5%);
+  - 76 km² ganham mais de 5%.
+- **Maiores perdas, com o potencial básico:**
+
+  | Bairro | Ganho |
+  |---|---|
+  | Azenha | −24% |
+  | Passo D'Areia | −15% |
+  | Cristo Redentor | −13% |
+  | Menino Deus | −12% |
+  | Vila Ipiranga | −10% |
+  | Santana | −9% |
+  | Rio Branco | −8% |
+  | Santa Cecília | −8% |
+
+  São basicamente as áreas de IA 1,9 que viraram CA 2,4 (−16%) e as de IA 1,3 que viraram CA 1,5 (−23%).
+- **Maiores ganhos na malha urbana:** 4º Distrito, com Farrapos (+91%), Navegantes (+85%) e Humaitá (+85%).
+- **Atenção às áreas rarefeitas (IA 0,1 / 0,2, 146 km²).** O percentual é alto porque a base é pequena: IA 0,1 → CA 0,3 dá +100%, mas é 0,12 → 0,24 m² privativo por m² de terreno. Bairros como Pitinga, Belém Velho e Ponta Grossa lideram em % por isso, não por virarem áreas adensáveis.
+
+A tabela completa está em `dados/tabelas/dinamica_por_bairro.csv`, coluna `ganho_priv_bas_pct`, agregada por área.
 
 ## 6. Limitações (leia antes de decidir)
 

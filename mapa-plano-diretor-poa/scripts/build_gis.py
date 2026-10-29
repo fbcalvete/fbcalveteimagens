@@ -23,6 +23,9 @@ os.makedirs(os.path.join(OUT, 'tabelas'), exist_ok=True)
 CRS_M = 31982   # SIRGAS 2000 / UTM 22S (metrico, usado pela Prefeitura)
 CRS_G = 4326
 FATOR_NAO_ADENSAVEL = 1.5  # metodologia SMAMUS: CA novo = areas adensaveis + nao adensaveis
+# Eficiencia de projeto (area privativa / area computavel em cada base de calculo).
+# 1,2 / 0,8 = 1,5: mesma equivalencia da SMAMUS.
+EF_ANT, EF_NOVO = 1.2, 0.8
 
 
 def ncode(c):
@@ -211,6 +214,13 @@ ov['d_ca_bas'] = (ov.ca_bas - ov.caeq_bas).round(2)
 ov['d_ca_max'] = (ov.ca_max - ov.caeq_max).round(2)
 ov['d_alt'] = (ov.alt_novo - ov.alt_ant).round(1)
 ov['r_ca_max'] = (ov.ca_max / ov.caeq_max).round(3)
+# ganho de area privativa com o potencial basico (e maximo): (CA x 0,8) / (IA x 1,2) - 1
+ov['priv_ant'] = (ov.ia_bas * EF_ANT).round(3)
+ov['priv_novo'] = (ov.ca_bas * EF_NOVO).round(3)
+pos = (ov.ia_bas > 0) & (ov.ca_bas > 0)
+ov['ganho_bas'] = ((ov.priv_novo / ov.priv_ant - 1) * 100).where(pos).round(1)
+posm = (ov.ia_max > 0) & (ov.ca_max > 0)
+ov['ganho_max'] = (((ov.ca_max * EF_NOVO) / (ov.ia_max * EF_ANT) - 1) * 100).where(posm).round(1)
 
 
 def classe(d, tol):
@@ -240,9 +250,21 @@ for bairro, df in ov.groupby(ov.bairro.fillna('(sem bairro)')):
         r['pct_camax_' + c.split()[0].lower()] = round(df.loc[df.din_camax == c, 'area_m2'].sum() / tot * 100, 1)
     comp = df.loc[df.d_ca_max.notna(), 'area_m2'].sum()
     r['pct_area_comparavel'] = round(comp / tot * 100, 1)
+    cp = df[df.ganho_bas.notna()]
+    r['ganho_priv_bas_pct'] = (round(((cp.priv_novo * cp.area_m2).sum() / (cp.priv_ant * cp.area_m2).sum() - 1) * 100, 1)
+                               if cp.area_m2.sum() >= 0.25 * tot else None)
     ok = comp / tot >= 0.25   # media so quando ao menos 1/4 do bairro e comparavel
     r.update({'d_ca_bas_medio': wmean(df, 'd_ca_bas') if ok else None, 'd_ca_max_medio': wmean(df, 'd_ca_max') if ok else None,
               'd_alt_medio_m': wmean(df, 'd_alt') if ok else None})
     rows.append(r)
-pd.DataFrame(rows).sort_values('d_ca_max_medio', ascending=False).to_csv(
+pd.DataFrame(rows).sort_values('ganho_priv_bas_pct', ascending=False).to_csv(
     os.path.join(OUT, 'tabelas', 'dinamica_por_bairro.csv'), index=False)
+
+# ---------------------------------------------------------------- Matriz IA basico x CA basico
+mx = ov[ov.ia_bas.notna() & ov.ca_bas.notna()].groupby(['ia_bas', 'ca_bas']).agg(
+    area_km2=('area_m2', lambda a: round(a.sum() / 1e6, 3)), pecas=('area_m2', 'size')).reset_index()
+mx['priv_ant'] = (mx.ia_bas * EF_ANT).round(3)
+mx['priv_novo'] = (mx.ca_bas * EF_NOVO).round(3)
+mx['ganho_pct'] = ((mx.priv_novo / mx.priv_ant - 1) * 100).round(1)
+mx.to_csv(os.path.join(OUT, 'tabelas', 'matriz_ia_ca_basico.csv'), index=False)
+print(mx.to_string(index=False))

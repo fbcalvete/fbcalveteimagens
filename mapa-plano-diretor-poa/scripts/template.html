@@ -26,6 +26,7 @@
   --bad: #c23b4a;
   --neutral: #7b7f86;
   --focus: #e0a100;
+  --hdr: #1b4a6e;       /* cabecalho da matriz IA x CA */
   --font-ui: "Overpass", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   --font-data: "Overpass Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
@@ -46,6 +47,7 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-ui); }
 * { box-sizing: border-box; }
 button, input, select { font: inherit; color: inherit; }
@@ -95,8 +97,30 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); width: 16
 .seg button { flex: 1 1 auto; border: 0; background: var(--surface); padding: 6px 10px; cursor: pointer; font-size: 13px; border-right: 1px solid var(--line); }
 .seg button:last-child { border-right: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
-.colorby { display: grid; gap: var(--s2); margin-top: var(--s3); }
-.colorby .lab { font-size: 12px; color: var(--muted); }
+.calc-box { margin-top: var(--s3); display: grid; gap: 6px; }
+.calc-box .lab { font-size: 12px; color: var(--muted); }
+.effrow { display: flex; flex-wrap: wrap; gap: 6px var(--s2); align-items: center; font-size: 13px; }
+.effrow input { width: 64px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); font-family: var(--font-data); }
+.formula { margin: 0; font-family: var(--font-data); font-size: 12px; }
+.mxwrap { overflow-x: auto; }
+.mx { border-collapse: separate; border-spacing: 2px; font-size: 11px; width: 100%; font-variant-numeric: tabular-nums; }
+.mx th { background: var(--hdr); color: #ffffff; font-weight: 700; padding: 4px 3px; font-family: var(--font-data); }
+.mx th.corner { font-size: 10px; white-space: nowrap; }
+.mx td { text-align: center; padding: 3px 2px; border-radius: 3px; line-height: 1.15; min-width: 38px; }
+.mx td b { display: block; font-family: var(--font-data); font-size: 11px; }
+.mx td small { display: block; font-size: 9px; opacity: 0.85; }
+.mx td.has { cursor: pointer; }
+.mx td.has:hover { outline: 2px solid var(--ink); outline-offset: -1px; }
+.mx td.none { opacity: 0.32; }
+.mx td.on { outline: 3px solid var(--ink); outline-offset: -2px; }
+.mxfilter { display: flex; gap: var(--s2); align-items: center; justify-content: space-between; margin-top: var(--s2); font-size: 12px; font-weight: 600; }
+.gain { display: flex; gap: var(--s3); align-items: center; margin-top: 8px; font-size: 13px; }
+.gchip { font-family: var(--font-data); font-weight: 700; font-size: 22px; padding: 4px 10px; border-radius: 5px; white-space: nowrap; }
+.gchip.sem { font-size: 13px; background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.calc { font-family: var(--font-data); font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.gbar { height: 12px; border-radius: 3px; margin-top: var(--s2); }
+.gticks { position: relative; height: 16px; font-size: 10px; font-family: var(--font-data); color: var(--muted); margin: 2px 6px 0; }
+.gticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .basemap { margin-top: var(--s3); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
 .basemap label { display: flex; gap: var(--s2); align-items: center; cursor: pointer; }
 
@@ -162,7 +186,10 @@ details.more p { margin: 6px 0 0; }
 .tip { position: absolute; z-index: 1000; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
   padding: 5px 8px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.18); max-width: 300px; }
 .tip div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tip .o { color: var(--old); font-weight: 700; } .tip .n { color: var(--accent); font-weight: 700; }
+.tip .o { color: var(--old); font-weight: 700; } .tip .n { color: var(--accent); font-weight: 700; margin-left: 6px; }
+.tip .g { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.tip .g i { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+.tip .z { color: var(--muted); font-size: 11px; }
 .chip { position: absolute; z-index: 1000; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; padding: 7px 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .tiles-msg { position: absolute; z-index: 1000; top: 10px; right: calc(10px + env(safe-area-inset-right, 0px)); background: var(--surface);
@@ -197,19 +224,19 @@ details.more p { margin: 6px 0 0; }
       <h2>Camadas</h2>
       <div class="layers">
         <div class="lyr">
-          <input type="checkbox" id="chk-old" checked aria-label="Mostrar plano antigo">
-          <label class="nm" for="chk-old"><i class="sw" style="background:var(--old)"></i><span><b>Plano antigo</b><em>PDDUA · subunidades e regime</em></span></label>
-          <div class="ctl"><button class="mini" id="out-old" aria-pressed="true" title="Mostrar só o contorno">Contorno</button><input type="range" id="op-old" min="0.1" max="0.95" step="0.05" value="0.6" aria-label="Opacidade do plano antigo"></div>
+          <input type="checkbox" id="chk-old" aria-label="Mostrar plano antigo">
+          <label class="nm" for="chk-old"><i class="sw" style="background:var(--old)"></i><span><b>Plano antigo</b><em>PDDUA · cor pelo IA básico</em></span></label>
+          <div class="ctl"><button class="mini" id="out-old" aria-pressed="false" title="Mostrar só o contorno">Contorno</button><input type="range" id="op-old" min="0.1" max="0.95" step="0.05" value="0.7" aria-label="Opacidade do plano antigo"></div>
         </div>
         <div class="lyr">
-          <input type="checkbox" id="chk-new" checked aria-label="Mostrar plano novo">
-          <label class="nm" for="chk-new"><i class="sw" style="background:var(--accent)"></i><span><b>Plano novo</b><em>LUOS sancionada · ZOTs</em></span></label>
-          <div class="ctl"><button class="mini" id="out-new" aria-pressed="false" title="Mostrar só o contorno">Contorno</button><input type="range" id="op-new" min="0.1" max="0.95" step="0.05" value="0.6" aria-label="Opacidade do plano novo"></div>
+          <input type="checkbox" id="chk-new" aria-label="Mostrar plano novo">
+          <label class="nm" for="chk-new"><i class="sw" style="background:var(--accent)"></i><span><b>Plano novo</b><em>LUOS sancionada · cor pelo CA básico</em></span></label>
+          <div class="ctl"><button class="mini" id="out-new" aria-pressed="false" title="Mostrar só o contorno">Contorno</button><input type="range" id="op-new" min="0.1" max="0.95" step="0.05" value="0.7" aria-label="Opacidade do plano novo"></div>
         </div>
         <div class="lyr">
-          <input type="checkbox" id="chk-ov" aria-label="Mostrar dinâmica">
-          <label class="nm" for="chk-ov"><i class="sw" style="background:linear-gradient(90deg,#de2d26,#e9e6df,#31a354)"></i><span><b>Dinâmica</b><em>sobreposição: o que mudou</em></span></label>
-          <div class="ctl"><input type="range" id="op-ov" min="0.1" max="0.95" step="0.05" value="0.75" aria-label="Opacidade da dinâmica"></div>
+          <input type="checkbox" id="chk-ov" checked aria-label="Mostrar dinâmica">
+          <label class="nm" for="chk-ov"><i class="sw" style="background:linear-gradient(90deg,#c00000,#efc100,#dfe503,#275317)"></i><span><b>Dinâmica</b><em>ganho de área privativa</em></span></label>
+          <div class="ctl"><input type="range" id="op-ov" min="0.1" max="0.95" step="0.05" value="0.8" aria-label="Opacidade da dinâmica"></div>
         </div>
         <div class="lyr">
           <input type="checkbox" id="chk-st" checked aria-label="Mostrar ruas">
@@ -218,21 +245,14 @@ details.more p { margin: 6px 0 0; }
         </div>
       </div>
 
-      <div class="colorby">
-        <div class="lab">Colorir os planos por</div>
-        <div class="seg" id="mode-plan" role="group" aria-label="Colorir os planos por">
-          <button data-v="zona" aria-pressed="true">Zona</button>
-          <button data-v="camax" aria-pressed="false">CA máximo</button>
-          <button data-v="cabas" aria-pressed="false">CA básico</button>
-          <button data-v="alt" aria-pressed="false">Altura</button>
+      <div class="calc-box">
+        <div class="lab">Eficiência de projeto (área privativa por m² computável)</div>
+        <div class="effrow">
+          <label for="ef-old">Antigo: IA ×</label><input id="ef-old" type="number" inputmode="decimal" step="0.05" min="0.1" max="3" value="1.2">
+          <label for="ef-new">Novo: CA ×</label><input id="ef-new" type="number" inputmode="decimal" step="0.05" min="0.1" max="3" value="0.8">
         </div>
-        <div class="lab">Colorir a dinâmica por</div>
-        <div class="seg" id="mode-ov" role="group" aria-label="Colorir a dinâmica por">
-          <button data-v="dcamax" aria-pressed="true">Δ CA máx.</button>
-          <button data-v="dcabas" aria-pressed="false">Δ CA básico</button>
-          <button data-v="dalt" aria-pressed="false">Δ Altura</button>
-          <button data-v="classe" aria-pressed="false">Ampliou/Reduziu</button>
-        </div>
+        <p class="formula">Ganho = (CA × <span id="f-new">0,8</span>) ÷ (IA × <span id="f-old">1,2</span>) − 1</p>
+        <p class="msg" id="efmsg"></p>
       </div>
       <div class="basemap">
         <label><input type="checkbox" id="chk-tiles"> Mapa de ruas online por baixo (CARTO, requer internet)</label>
@@ -244,8 +264,15 @@ details.more p { margin: 6px 0 0; }
       <div class="result" id="result"><div class="empty">Clique no mapa ou busque um endereço para ver o regime do plano antigo e do novo naquele ponto.</div></div>
     </section>
 
+    <section aria-label="Matriz IA × CA básico">
+      <h2>Matriz IA básico × CA básico</h2>
+      <div class="mxwrap"><table class="mx" id="mx"></table></div>
+      <div class="mxfilter" id="mxfilter" hidden><span id="mxlabel"></span><button class="mini" id="mxclear">Mostrar todas</button></div>
+      <p class="note">Linhas: IA do plano antigo. Colunas: CA básico do plano novo. Cada célula traz o ganho e a área onde a combinação ocorre. Clique numa célula para ver só aquelas áreas no mapa. Células apagadas não ocorrem na cidade. CA básico 3,0 não existe no plano novo (3,0 é o CA máximo das ZOT 02 e 03).</p>
+    </section>
+
     <section aria-label="Resumo da dinâmica">
-      <h2>Resumo da dinâmica · CA máximo</h2>
+      <h2>Resumo da dinâmica · ganho com o potencial básico</h2>
       <div id="summary"></div>
     </section>
 
@@ -258,7 +285,7 @@ details.more p { margin: 6px 0 0; }
       <h2>Fontes e método</h2>
       <p><b>Plano antigo:</b> subunidades do PDDUA (LC 434/99, com alterações), do serviço oficial usado pelo DMWeb (Procempa, <span class="code">SMAMS_DM/TM_POA_SMAMS_Plano_Diretor</span>). Regime pelos Anexos 5.1 (zonas de uso), 6 (índice de aproveitamento) e 7.1 (volumetria), tabelas da SMAMUS.</p>
       <p><b>Plano novo:</b> mapa de zoneamento da LUOS sancionada em 14/07/2026, com emendas e polígonos vetados (SMAMUS, “LUOS Zoneamento POA”), complementado pelo Anexo 5 do PDUS onde aquele mapa não cobre. Regime por ZOT a partir do Anexo 5. A versão pós-audiência (set/2025, a do link do ArcGIS Experience) aparece na consulta como “ZOT no projeto”.</p>
-      <p><b>Comparação:</b> o CA do plano novo soma áreas adensáveis e não adensáveis. Para comparar, o IA do PDDUA é multiplicado por 1,5 (“CA equivalente”), a mesma regra da SMAMUS no comparativo oficial. Diferença menor que 0,05 no CA ou 0,5 m na altura conta como “manteve”. CA máximo “não se aplica” ou “Ajuste/TDC” é tratado como igual ao básico.</p>
+      <p><b>Comparação:</b> a base de cálculo muda entre os planos. O IA do PDDUA conta só áreas adensáveis; o CA novo soma adensáveis e não adensáveis. A área privativa potencial é IA × 1,2 no plano antigo e CA × 0,8 no novo (eficiências editáveis acima). Ganho = (CA × 0,8) ÷ (IA × 1,2) − 1. A razão 1,2 ÷ 0,8 = 1,5 é a mesma equivalência que a SMAMUS usa no comparativo oficial. CA máximo “não se aplica” ou “Ajuste/TDC” é tratado como igual ao básico.</p>
       <ul>
         <li>As leis novas entram em vigor 180 dias após a publicação (14/07/2026). Até lá vale o PDDUA.</li>
         <li>ZOT 08.3 - D (emenda; Cidade Baixa e Bom Fim) ainda não tem parâmetros na base GIS da Prefeitura.</li>
@@ -340,103 +367,73 @@ function find(layer, ll) {
 }
 
 /* ---------- atributos ---------- */
-const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 const OLD = D.old.a.map((a) => {
   const ia = D.lk.ia[a[6]] || [], vol = D.lk.vol[a[7]] || [];
   return { cod: a[0], mz: a[1], ueu: a[2], sub: a[3], dens: a[4], ativ: a[5], iaCod: a[6], volCod: a[7], obs: a[8],
     zona: D.lk.zu[a[5]] || 'Regime urbanístico próprio', iaBas: ia[0], iaMax: ia[1], sc: ia[2], tpc: ia[3], quota: ia[4],
-    iaObs: ia[5], alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4],
-    caBas: ia[0] == null ? null : r2(ia[0] * 1.5), caMax: ia[1] == null ? null : r2(ia[1] * 1.5) };
+    iaObs: ia[5], alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4] };
 });
 const NEW = D.new.a.map((a) => {
   const r = D.reg[a[0]] || {};
   return { zot: a[0], bairro: a[1], setor: a[2], upl: a[3], comp: a[4] === 1, zotProj: a[5], caBas: r.ca_bas, caMax: r.ca_max,
     alt: r.alt_max, r };
 });
-function cmp(d, tol) { return d == null || isNaN(d) ? 'sem' : d > tol ? 'amp' : d < -tol ? 'red' : 'man'; }
-function dyn(o, n) {
-  const dB = o.caBas != null && n.caBas != null ? r2(n.caBas - o.caBas) : null;
-  const dM = o.caMax != null && n.caMax != null ? r2(n.caMax - o.caMax) : null;
-  const dA = o.alt != null && n.alt != null ? Math.round((n.alt - o.alt) * 10) / 10 : null;
-  return { dB, dM, dA, cB: cmp(dB, 0.05), cM: cmp(dM, 0.05), cA: cmp(dA, 0.5) };
-}
-const OV = D.ov.a.map(([i, j]) => dyn(OLD[i], NEW[j]));
 
-/* ---------- classes e cores ---------- */
-const ZU = D.cores.zu;
-const ZOT = D.cores.zot;
-const SEM = { color: '#b9bcc6', label: 'Sem valor comparável (regime próprio, especial, rural)' };
+/* ---------- area privativa e ganho ----------
+   Eficiencia de projeto: area privativa por m2 computavel em cada base de calculo.
+   Antigo: IA x 1,2   Novo: CA x 0,8   Ganho = (CA x 0,8) / (IA x 1,2) - 1 */
+const EF = { old: 1.2, new: 0.8 };
+const privOld = (ia) => (ia > 0 ? ia * EF.old : null);
+const privNew = (ca) => (ca > 0 ? ca * EF.new : null);
+function gainOf(ia, ca) { const a = privOld(ia), b = privNew(ca); return a && b ? b / a - 1 : null; }
+function dyn(o, n) {
+  const dA = o.alt != null && n.alt != null ? Math.round((n.alt - o.alt) * 10) / 10 : null;
+  return { gB: gainOf(o.iaBas, n.caBas), gM: gainOf(o.iaMax, n.caMax), dA };
+}
+
+/* ---------- cores ---------- */
 const fmt = (v, d = 2) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
-function binsOf(edges, colors, unit, inclusive) {
-  const cls = colors.map((c, i) => {
-    const lo = i === 0 ? null : edges[i - 1], hi = i < edges.length ? edges[i] : null;
-    const label = lo == null ? `até ${fmt(hi)}${unit}` : hi == null ? `acima de ${fmt(lo)}${unit}` : `${fmt(lo)} – ${fmt(hi)}${unit}`;
-    return { key: 'b' + i, color: c, label };
-  });
-  return { cls, of(v) { if (v == null || isNaN(v)) return 'sem'; let i = 0; while (i < edges.length && (inclusive ? v > edges[i] : v >= edges[i])) i++; return 'b' + i; } };
-}
-const CA_BINS = binsOf([0.4, 0.8, 1.25, 1.75, 2.2, 2.7, 3.3, 4.25, 5.5, 7, 9],
-  ['#fff7d6', '#fde9a9', '#fdd27e', '#fcb35c', '#f98f45', '#f0663b', '#dc4237', '#bd2a46', '#992057', '#721b62', '#4c1660', '#2a0f4f'], '', false);
-const ALT_BINS = binsOf([9, 12.5, 18, 27, 33, 42, 52, 60, 75, 90, 100],
-  ['#fde725', '#c2df23', '#86d549', '#52c569', '#2ab07f', '#1e9b8a', '#25858e', '#2d708e', '#38588c', '#433e85', '#482173', '#440154'], ' m', true);
-/* escala divergente: neg em ordem crescente (ex.: [-2, -1]), pos crescente (ex.: [1, 2, 3, 5]).
-   n0 = maior reducao ... pN = maior ampliacao; |d| <= tol conta como "manteve". */
-function divOf(neg, pos, unit, tol) {
-  const cneg = ['#a50f15', '#de2d26', '#fc9272'].slice(3 - (neg.length + 1));
-  const cpos = ['#c7e9c0', '#a1d99b', '#74c476', '#31a354', '#006d2c'].slice(0, pos.length + 1);
-  const cls = [];
-  for (let i = 0; i <= neg.length; i++) {
-    const label = i === 0 ? `reduziu ${fmt(-neg[0])}${unit} ou mais` : i === neg.length ? `reduziu até ${fmt(-neg[i - 1])}${unit}`
-      : `reduziu ${fmt(-neg[i])} a ${fmt(-neg[i - 1])}${unit}`;
-    cls.push({ key: 'n' + i, color: cneg[i], label });
+const pct = (g, d = 0) => (g == null ? '—' : (g > 0.0005 ? '+' : '') + (g * 100).toLocaleString('pt-BR', { maximumFractionDigits: d }).replace('-', '−') + '%');
+const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const rgb2hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+function ramp(anch, v) {   /* interpolacao linear entre ancoras [valor, cor], com saturacao nas pontas */
+  if (v <= anch[0][0]) return anch[0][1];
+  for (let i = 1; i < anch.length; i++) {
+    if (v <= anch[i][0]) {
+      const [v0, c0] = anch[i - 1], [v1, c1] = anch[i], t = (v - v0) / (v1 - v0), a = hex2rgb(c0), b = hex2rgb(c1);
+      return rgb2hex(a.map((x, k) => x + (b[k] - x) * t));
+    }
   }
-  cls.push({ key: 'z', color: '#e9e6df', label: `manteve (±${fmt(tol)}${unit})` });
-  for (let i = 0; i <= pos.length; i++) {
-    const label = i === 0 ? `ampliou até ${fmt(pos[0])}${unit}` : i === pos.length ? `ampliou mais de ${fmt(pos[i - 1])}${unit}`
-      : `ampliou ${fmt(pos[i - 1])} a ${fmt(pos[i])}${unit}`;
-    cls.push({ key: 'p' + i, color: cpos[i], label });
-  }
-  return { cls, of(d) {
-    if (d == null || isNaN(d)) return 'sem';
-    if (Math.abs(d) <= tol) return 'z';
-    let i = 0;
-    if (d < 0) { while (i < neg.length && d > neg[i]) i++; return 'n' + i; }
-    while (i < pos.length && d > pos[i]) i++; return 'p' + i;
-  } };
+  return anch[anch.length - 1][1];
 }
-const DCA = divOf([-2, -1], [1, 2, 3, 5], '', 0.05);
-const DCB = divOf([-2, -1], [1, 2, 3, 5], '', 0.05);
-const DALT = divOf([-20], [10, 30, 60], ' m', 0.5);
-const CLASSE = { amp: { color: '#2e9e5b', label: 'Ampliou' }, man: { color: '#d9d5cc', label: 'Manteve' }, red: { color: '#d1495b', label: 'Reduziu' } };
+const GANHO = D.cores.ganho;   /* cores da tabela IA x CA (ganho em %) */
+const gainColor = (g) => ramp(GANHO, g * 100);
+const privColor = (v) => ramp(D.cores.priv, v);
+const inkOn = (hex) => { const [r, g, b] = hex2rgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1b1b1b' : '#ffffff'; };
+const SEM = { color: '#b9bcc6', label: 'Sem comparação (IA ou CA não numérico)' };
+const SEM_OLD = { color: '#b9bcc6', label: 'IA não numérico (regime próprio, EVU, lei específica)' };
+const SEM_NEW = { color: '#b9bcc6', label: 'CA não numérico (Especial, Zona Rural, vetado, ZOT 08.3-D)' };
 
 const state = {
-  old: { on: true, outline: true, op: 0.6 }, new: { on: true, outline: false, op: 0.6 }, ov: { on: false, op: 0.75 },
-  st: true, tiles: false, mode: 'zona', omode: 'dcamax',
+  old: { on: false, outline: false, op: 0.7 }, new: { on: false, outline: false, op: 0.7 }, ov: { on: true, op: 0.8 },
+  st: true, tiles: false, filter: null,
 };
 function classify(name, i) {
-  const m = state.mode;
   if (name === 'old') {
-    const o = OLD[i];
-    if (m === 'zona') return { k: 'z' + o.ativ, color: ZU[o.ativ] || SEM.color, label: o.zona };
-    const v = m === 'camax' ? o.caMax : m === 'cabas' ? o.caBas : o.alt;
-    return binClass(m === 'alt' ? ALT_BINS : CA_BINS, v);
+    const o = OLD[i], v = privOld(o.iaBas);
+    if (v == null) return { k: 'sem', ...SEM_OLD };
+    return { k: 'i' + o.iaBas, color: privColor(v), order: o.iaBas, label: `IA ${fmt(o.iaBas)}  ·  ${fmt(v)} m² privativos por m² de terreno` };
   }
   if (name === 'new') {
-    const n = NEW[i];
-    if (m === 'zona') return { k: 'z' + n.zot, color: ZOT[n.zot] || SEM.color, label: n.zot };
-    const v = m === 'camax' ? n.caMax : m === 'cabas' ? n.caBas : n.alt;
-    return binClass(m === 'alt' ? ALT_BINS : CA_BINS, v);
+    const n = NEW[i], v = privNew(n.caBas);
+    if (v == null) return { k: 'sem', ...SEM_NEW };
+    return { k: 'c' + n.caBas, color: privColor(v), order: n.caBas, label: `CA ${fmt(n.caBas)}  ·  ${fmt(v)} m² privativos por m² de terreno` };
   }
-  const d = OV[i], om = state.omode;
-  if (om === 'classe') { const c = d.cM; return c === 'sem' ? { k: 'sem', ...SEM } : { k: c, ...CLASSE[c] }; }
-  const B = om === 'dcamax' ? DCA : om === 'dcabas' ? DCB : DALT;
-  return binClass(B, om === 'dcamax' ? d.dM : om === 'dcabas' ? d.dB : d.dA);
-}
-function binClass(B, v) {
-  const k = B.of(v);
-  if (k === 'sem') return { k: 'sem', ...SEM };
-  const c = B.cls.find((x) => x.key === k);
-  return { k, color: c.color, label: c.label, order: B.cls.indexOf(c) };
+  const [a, b] = D.ov.a[i], o = OLD[a], n = NEW[b], f = state.filter;
+  if (f && !(o.iaBas === f.ia && n.caBas === f.ca)) return null;
+  const g = gainOf(o.iaBas, n.caBas);
+  if (g == null) return { k: 'sem', ...SEM };
+  return { k: 'g' + Math.round(g * 1000), color: gainColor(g), order: g, label: pct(g) };
 }
 
 /* ---------- mapa ---------- */
@@ -467,6 +464,7 @@ function render(name) {
     const groups = new Map();
     lay.feats.forEach((f, i) => {
       const c = classify(name, i);
+      if (!c) return;
       let e = groups.get(c.k); if (!e) { e = { c, polys: [], n: 0 }; groups.set(c.k, e); }
       for (const p of f) e.polys.push(p); e.n++;
     });
@@ -475,20 +473,10 @@ function render(name) {
       g.addLayer(L.polygon(e.polys, { renderer: R[name], interactive: false, fillColor: e.c.color, fillOpacity: e.c.k === 'sem' ? st.op * 0.55 : st.op,
         color: edge, weight: name === 'ov' ? 0.25 : 0.5, opacity: 0.55 }));
     }
-    LEG[name] = [...groups.values()].map((e) => e.c).sort(legSort(name));
+    LEG[name] = [...groups.values()].map((e) => e.c).sort((x, y) => (x.k === 'sem') - (y.k === 'sem') || x.order - y.order);
   }
   if (!map.hasLayer(g)) g.addTo(map);
 }
-function legSort(name) {
-  return (a, b) => {
-    if (a.k === 'sem') return 1; if (b.k === 'sem') return -1;
-    if (a.order != null && b.order != null) return a.order - b.order;
-    if (name === 'old') { const na = parseFloat(a.k.slice(1)), nb = parseFloat(b.k.slice(1)); return na - nb; }
-    const ka = Object.keys(ZOT).indexOf(a.label), kb = Object.keys(ZOT).indexOf(b.label);
-    return (ka < 0 ? 999 : ka) - (kb < 0 ? 999 : kb) || a.label.localeCompare(b.label);
-  };
-}
-
 /* ruas */
 const ST = D.st, STN = ST.n;
 const SEG = ST.s.map((s) => ({ n: s[0], ii: s[1], if: s[2], pi: s[3], pf: s[4], ll: dec(s[5], 1e5) }));
@@ -619,9 +607,12 @@ function query(ll, opts = {}) {
   const cp = $('#copy'); if (cp) cp.addEventListener('click', copySummary);
   if (window.matchMedia('(max-width: 820px)').matches && !opts.silent) $('#chip').hidden = false;
 }
-function pill(c) { return `<span class="pill ${c}">${{ amp: 'Ampliou', red: 'Reduziu', man: 'Manteve', sem: 'Sem comparação' }[c]}</span>`; }
 const sign = (v, d = 2, u = '') => (v == null ? '—' : (v > 0 ? '+' : '') + fmt(v, d) + u);
-const m2 = (v) => (v == null ? '—' : v + ' m');
+function gainChip(g) {
+  if (g == null) return `<span class="gchip sem">Sem comparação</span>`;
+  const c = gainColor(g);
+  return `<span class="gchip" style="background:${c};color:${inkOn(c)}">${pct(g)}</span>`;
+}
 function resultHTML(q) {
   const { ll, io, inw, near } = q;
   let h = '';
@@ -638,21 +629,33 @@ function resultHTML(q) {
   }
   h += `<div class="addr">${addr}${addr ? '<br>' : ''}<span class="code">${coord}</span></div>`;
   if (io < 0 && inw < 0) return h + '<div class="empty">Ponto fora das zonas dos dois planos (rio, via ou fora do município).</div>';
+  if (io >= 0 && inw >= 0) {
+    const o = OLD[io], n = NEW[inw], d = dyn(o, n), po = privOld(o.iaBas), pn = privNew(n.caBas);
+    h += `<div class="card dyn"><h3>Ganho de área privativa neste ponto</h3>
+      <div class="gain">${gainChip(d.gB)}<span>com o potencial <b>básico</b>:<br>IA ${fmt(o.iaBas)} (antigo) → CA ${esc(n.r.ca_bas_txt || '—')} (novo)</span></div>
+      ${d.gB != null ? `<p class="calc">(CA ${fmt(n.caBas)} × ${fmt(EF.new)}) ÷ (IA ${fmt(o.iaBas)} × ${fmt(EF.old)}) − 1 = ${fmt(pn)} ÷ ${fmt(po)} − 1</p>`
+        : `<p class="note">${o.iaBas == null ? 'O IA do plano antigo não é numérico neste ponto (regime próprio / EVU / lei específica).' : 'O CA do plano novo não é numérico neste ponto (' + esc(n.r.ca_bas_txt || n.zot) + ').'}</p>`}
+      <dl class="kv" style="margin-top:8px">
+        <dt>Com o potencial máximo (IA ${fmt(o.iaMax)} → CA ${fmt(n.caMax)})</dt><dd>${pct(d.gM)}</dd>
+        <dt>Altura máxima</dt><dd>${fmt(o.alt, 1)} → ${fmt(n.alt, 1)} m${d.dA != null ? ` (${sign(d.dA, 1)})` : ''}</dd>
+      </dl>
+      <div class="actions" style="margin-top:10px"><button class="btn" id="copy">Copiar resumo</button></div></div>`;
+  }
   if (io >= 0) {
     const o = OLD[io];
     const daiv = [o.dens, o.ativ, o.iaCod, o.volCod].map((x) => x || '—').join(' · ');
     h += `<div class="card old"><h3>Plano antigo · PDDUA</h3><div class="zone">${esc(o.zona)}</div>
       <div class="code">MZ ${o.mz} · UEU ${o.ueu} · Subunidade ${o.sub} &nbsp;|&nbsp; D·A·I·V ${esc(daiv)}</div>
       <dl class="kv" style="margin-top:8px">
-        <dt>Índice de aproveitamento (IA)</dt><dd>${fmt(o.iaBas)}</dd>
+        <dt>IA básico (Anexo 6)</dt><dd>${fmt(o.iaBas)}</dd>
         <dt>IA máximo (solo criado + TPC)</dt><dd>${fmt(o.iaMax)}</dd>
-        <dt>CA equivalente básico / máx. (×1,5)</dt><dd>${fmt(o.caBas)} / ${fmt(o.caMax)}</dd>
+        <dt>Área privativa potencial (IA × ${fmt(EF.old)}), básica / máxima</dt><dd>${fmt(privOld(o.iaBas))} / ${fmt(privOld(o.iaMax))}</dd>
         <dt>Solo criado · TPC · quota ideal</dt><dd class="txt">${esc(o.sc || '—')} · ${esc(o.tpc || '—')} · ${esc(o.quota || '—')}${o.quota && o.quota !== '-' ? ' m²' : ''}</dd>
         <dt>Altura máxima</dt><dd>${o.alt != null ? fmt(o.alt, 1) + ' m' : `<span class="txt">${esc(o.altTxt || '—')}</span>`}</dd>
         <dt>Altura na divisa · base</dt><dd class="txt">${esc(o.altDiv || '—')} · ${esc(o.altBase || '—')}</dd>
         <dt>Taxa de ocupação</dt><dd class="txt">${esc(o.to || '—')}</dd>
       </dl>
-      ${o.iaBas == null ? `<p class="note">${esc(o.iaObs || '')}</p>` : o.iaObs ? `<p class="note">${esc(o.iaObs)}</p>` : ''}
+      ${o.iaObs ? `<p class="note">${esc(o.iaObs)}</p>` : ''}
       ${o.obs ? `<p class="note">Observações da subunidade (códigos): ${esc(o.obs)}</p>` : ''}
       ${q.viaO != null ? `<p class="note">O ponto cai na via; mostrando a subunidade mais próxima (a ${Math.round(q.viaO)} m). Confira o lado da rua.</p>` : ''}</div>`;
   }
@@ -661,8 +664,9 @@ function resultHTML(q) {
     h += `<div class="card new"><h3>Plano novo · LUOS 2026</h3><div class="zone">${esc(n.zot)}${r.ocupacao ? ` <span class="code">· ocupação ${esc(r.ocupacao)}</span>` : ''}</div>
       <div class="code">${esc([n.bairro, n.setor, n.upl].filter(Boolean).join(' · '))}</div>
       <dl class="kv" style="margin-top:8px">
-        <dt>Coeficiente de aproveitamento básico</dt><dd>${esc(r.ca_bas_txt || '—')}</dd>
-        <dt>Coeficiente de aproveitamento máximo</dt><dd>${esc(r.ca_max_txt || '—')}</dd>
+        <dt>CA básico</dt><dd>${esc(r.ca_bas_txt || '—')}</dd>
+        <dt>CA máximo</dt><dd>${esc(r.ca_max_txt || '—')}</dd>
+        <dt>Área privativa potencial (CA × ${fmt(EF.new)}), básica / máxima</dt><dd>${fmt(privNew(n.caBas))} / ${fmt(privNew(n.caMax))}</dd>
         <dt>Altura máxima</dt><dd>${r.alt_txt ? esc(r.alt_txt) + (r.alt_max != null ? ' m' : '') : '—'}</dd>
         <dt>Lote mínimo · módulo de fracionamento</dt><dd class="txt">${esc(r.lote_min || '—')} m² · ${esc(r.mod_frac || '—')} m²</dd>
         <dt>Taxa de permeabilidade</dt><dd>${r.perm_min ? esc(r.perm_min) + ' a ' + esc(r.perm_max) + '%' : '—'}</dd>
@@ -673,26 +677,14 @@ function resultHTML(q) {
       ${q.viaN != null ? `<p class="note">O ponto cai na via; mostrando o quarteirão mais próximo (a ${Math.round(q.viaN)} m). Confira o lado da rua.</p>` : ''}
       ${r.caract || r.finalid ? `<details class="more"><summary>Caracterização e finalidade da zona</summary>${r.caract ? `<p>${esc(r.caract)}</p>` : ''}${r.finalid ? `<p>${esc(r.finalid)}</p>` : ''}</details>` : ''}</div>`;
   }
-  if (io >= 0 && inw >= 0) {
-    const o = OLD[io], n = NEW[inw], d = dyn(o, n);
-    h += `<div class="card dyn"><h3>Dinâmica neste ponto</h3>
-      <div class="dgrid" style="margin-top:8px">
-        <span class="h">Parâmetro</span><span class="h n">Antigo</span><span class="h n">Novo</span><span class="h">Δ</span>
-        <span>CA básico</span><span class="n">${fmt(o.caBas)}</span><span class="n">${fmt(n.caBas)}</span><span>${sign(d.dB)} ${pill(d.cB)}</span>
-        <span>CA máximo</span><span class="n">${fmt(o.caMax)}</span><span class="n">${fmt(n.caMax)}</span><span>${sign(d.dM)} ${pill(d.cM)}</span>
-        <span>Altura (m)</span><span class="n">${fmt(o.alt, 1)}</span><span class="n">${fmt(n.alt, 1)}</span><span>${sign(d.dA, 1)} ${pill(d.cA)}</span>
-      </div>
-      ${o.caMax && n.caMax ? `<p class="note">Potencial máximo no novo plano: ${fmt(n.caMax / o.caMax * 100, 0)}% do antigo (CA equivalente).</p>` : ''}
-      <div class="actions" style="margin-top:10px"><button class="btn" id="copy">Copiar resumo</button></div></div>`;
-  }
   return h;
 }
 function summaryText(q) {
   const o = q.io >= 0 ? OLD[q.io] : null, n = q.inw >= 0 ? NEW[q.inw] : null;
   const L1 = [`Ponto: ${q.ll.lat.toFixed(6)}, ${q.ll.lng.toFixed(6)}${q.label ? ' (' + q.label + ')' : ''}`];
-  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${fmt(o.iaBas)} (máx ${fmt(o.iaMax)}) | CA eq. ${fmt(o.caBas)}/${fmt(o.caMax)} | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}`);
-  if (n) L1.push(`LUOS 2026: ${n.zot} | CA ${n.r.ca_bas_txt || '—'}/${n.r.ca_max_txt || '—'} | altura ${n.r.alt_txt || '—'} m | lote mín. ${n.r.lote_min || '—'} m²`);
-  if (o && n) { const d = dyn(o, n); L1.push(`Dinâmica: CA básico ${sign(d.dB)} | CA máx ${sign(d.dM)} | altura ${sign(d.dA, 1, ' m')}`); }
+  if (o && n) { const d = dyn(o, n); L1.push(`Ganho de área privativa (básico): ${pct(d.gB, 1)} | IA ${fmt(o.iaBas)} × ${fmt(EF.old)} → CA ${fmt(n.caBas)} × ${fmt(EF.new)} | com potencial máximo: ${pct(d.gM, 1)}`); }
+  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${fmt(o.iaBas)} (máx ${fmt(o.iaMax)}) | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}`);
+  if (n) L1.push(`LUOS 2026: ${n.zot} | CA ${n.r.ca_bas_txt || '—'} (máx ${n.r.ca_max_txt || '—'}) | altura ${n.r.alt_txt || '—'} m | lote mín. ${n.r.lote_min || '—'} m²`);
   return L1.join('\n');
 }
 function copySummary(ev) {
@@ -701,16 +693,24 @@ function copySummary(ev) {
   try { navigator.clipboard.writeText(t).then(() => done(true), () => done(false)); } catch (e) { done(false); }
 }
 
-/* tooltip ao passar o mouse */
+/* tooltip ao passar o mouse: ganho percentual, IA anterior e CA futuro */
 const tip = $('#tip'); let raf = 0, pend = null;
 map.on('mousemove', (e) => { pend = e; if (!raf) raf = requestAnimationFrame(hover); });
 map.on('mouseout', () => { tip.hidden = true; });
 function hover() {
   raf = 0; const e = pend; if (!e) return;
+  if (!state.old.on && !state.new.on && !state.ov.on) { tip.hidden = true; return; }
+  const i = find(L_OLD, e.latlng), j = find(L_NEW, e.latlng);
+  const o = i >= 0 ? OLD[i] : null, n = j >= 0 ? NEW[j] : null;
+  if (!o && !n) { tip.hidden = true; return; }
   const rows = [];
-  if (state.old.on) { const i = find(L_OLD, e.latlng); if (i >= 0) { const o = OLD[i]; rows.push(`<div><span class="o">Antigo</span> ${esc(o.zona)} · IA ${fmt(o.iaBas)}/${fmt(o.iaMax)} · ${o.alt != null ? fmt(o.alt, 1) + ' m' : '—'}</div>`); } }
-  if (state.new.on) { const j = find(L_NEW, e.latlng); if (j >= 0) { const n = NEW[j]; rows.push(`<div><span class="n">Novo</span> ${esc(n.zot)} · CA ${esc(n.r.ca_bas_txt || '—')}/${esc(n.r.ca_max_txt || '—')} · ${n.r.alt_txt ? esc(n.r.alt_txt) + ' m' : '—'}</div>`); } }
-  if (!rows.length) { tip.hidden = true; return; }
+  if (o && n) {
+    const g = gainOf(o.iaBas, n.caBas), c = g == null ? SEM.color : gainColor(g);
+    rows.push(`<div class="g"><i style="background:${c}"></i><b>${g == null ? 'Sem comparação' : pct(g)}</b>${g == null ? '' : ' de área privativa'}</div>`);
+  }
+  rows.push(`<div><span class="o">IA anterior</span> ${o ? (o.iaBas != null ? fmt(o.iaBas) : 'regime próprio') : '—'}`
+    + `  <span class="n">CA futuro</span> ${n ? esc(n.r.ca_bas_txt || '—') : '—'}</div>`);
+  rows.push(`<div class="z">${o ? esc(o.zona) : '—'} → ${n ? esc(n.zot) : '—'}</div>`);
   tip.innerHTML = rows.join('');
   tip.hidden = false;
   const W = map.getSize(), p = e.containerPoint, tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -850,23 +850,85 @@ qIn.addEventListener('keydown', (ev) => {
 sugg.addEventListener('mousedown', (ev) => { const li = ev.target.closest('li'); if (li) { ev.preventDefault(); choose(+li.dataset.i); } });
 qIn.addEventListener('blur', () => setTimeout(() => { sugg.hidden = true; }, 150));
 
-/* ---------- legenda e resumo ---------- */
+/* ---------- legenda, matriz e resumo ---------- */
+const G_MIN = GANHO[0][0], G_MAX = GANHO[GANHO.length - 1][0];
+const gPos = (v) => ((v - G_MIN) / (G_MAX - G_MIN)) * 100;
 function legendHTML() {
   const parts = [];
-  const blk = (title, items, open) => `<details ${open ? 'open' : ''}><summary>${title}</summary><ul>${items.map((c) =>
-    `<li><i style="background:${c.color};${c.border ? `border:2px dashed ${c.border}` : ''}"></i><span>${esc(c.label)}</span></li>`).join('')}</ul></details>`;
-  const modeName = { zona: 'zonas', camax: 'CA máximo', cabas: 'CA básico', alt: 'altura máxima' }[state.mode];
-  if (state.ov.on) parts.push(blk('Dinâmica · ' + { dcamax: 'Δ CA máximo (novo − antigo eq.)', dcabas: 'Δ CA básico', dalt: 'Δ altura máxima', classe: 'CA máximo' }[state.omode], LEG.ov, true));
-  if (state.new.on) parts.push(blk('Plano novo · ' + modeName, LEG.new, !state.ov.on));
-  if (state.old.on) parts.push(blk('Plano antigo · ' + (state.mode === 'zona' ? 'zonas de uso (Anexo 5.1)' : modeName + (state.mode === 'alt' ? '' : ' equivalente')), LEG.old, !state.ov.on && state.old.outline === false));
+  const list = (items) => `<ul>${items.map((c) =>
+    `<li><i style="background:${c.color};${c.border ? `border:2px dashed ${c.border}` : ''}"></i><span>${esc(c.label)}</span></li>`).join('')}</ul>`;
+  if (state.ov.on) {
+    const grad = GANHO.map(([v, c]) => `${c} ${gPos(v).toFixed(1)}%`).join(',');
+    const ticks = [G_MIN, 0, 33, 60, 100, G_MAX].map((v) => `<span style="left:${gPos(v).toFixed(1)}%">${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}%</span>`).join('');
+    parts.push(`<details open><summary>Dinâmica · ganho de área privativa (potencial básico)</summary>
+      <div class="gbar" style="background:linear-gradient(90deg,${grad})"></div><div class="gticks">${ticks}</div>
+      <p class="note">Cores da tabela IA × CA. Abaixo de ${G_MIN}% fica no vermelho mais escuro; acima de +${G_MAX}%, no verde mais escuro.</p>
+      ${list([SEM])}</details>`);
+  }
+  if (state.new.on) parts.push(`<details open><summary>Plano novo · CA básico</summary>${list(LEG.new)}</details>`);
+  if (state.old.on) parts.push(`<details open><summary>Plano antigo · IA básico</summary>${list(LEG.old)}</details>`);
+  if (state.old.on || state.new.on) parts.push('<p class="note">Os dois planos usam a mesma escala de área privativa potencial (IA × eficiência antiga, CA × eficiência nova): mesma cor = mesma área privativa por m² de terreno.</p>');
   $('#legend').innerHTML = parts.join('') || '<div class="empty">Ligue uma camada para ver a legenda.</div>';
 }
+const IA_VALS = [...new Set(OLD.map((o) => o.iaBas).filter((v) => v > 0))].sort((a, b) => a - b);
+const CA_VALS = [...new Set(NEW.map((n) => n.caBas).filter((v) => v > 0))].sort((a, b) => a - b);
+const AREA = new Map();
+D.ov.a.forEach(([a, b, ar]) => {
+  const ia = OLD[a].iaBas, ca = NEW[b].caBas, k = ia > 0 && ca > 0 ? ia + '|' + ca : 'sem';
+  AREA.set(k, (AREA.get(k) || 0) + ar);
+});
+const fmtArea = (m) => (m >= 1e6 ? fmt(m / 1e6, 1) + ' km²' : m >= 1e4 ? fmt(m / 1e4, 0) + ' ha' : '< 1 ha');
+function matrixHTML() {
+  let h = `<thead><tr><th class="corner">IA \\ CA</th>${CA_VALS.map((c) => `<th>${fmt(c)}</th>`).join('')}</tr></thead><tbody>`;
+  for (const ia of IA_VALS) {
+    h += `<tr><th>${fmt(ia)}</th>`;
+    for (const ca of CA_VALS) {
+      const g = gainOf(ia, ca), col = gainColor(g), ar = AREA.get(ia + '|' + ca) || 0;
+      const on = !!state.filter && state.filter.ia === ia && state.filter.ca === ca;
+      const tt = `IA ${fmt(ia)} → CA ${fmt(ca)}: ${pct(g, 1)}${ar ? ' · ' + fmtArea(ar) + ' no mapa' : ' · não ocorre no mapa'}`;
+      h += ar ? `<td class="has${on ? ' on' : ''}" data-ia="${ia}" data-ca="${ca}" tabindex="0" role="button" aria-pressed="${on}" title="${tt}" style="background:${col};color:${inkOn(col)}"><b>${pct(g)}</b><small>${fmtArea(ar)}</small></td>`
+        : `<td class="none" title="${tt}" style="background:${col};color:${inkOn(col)}"><b>${pct(g)}</b></td>`;
+    }
+    h += '</tr>';
+  }
+  $('#mx').innerHTML = h + '</tbody>';
+  const f = state.filter;
+  $('#mxfilter').hidden = !f;
+  if (f) $('#mxlabel').textContent = `Mostrando só IA ${fmt(f.ia)} → CA ${fmt(f.ca)} (${pct(gainOf(f.ia, f.ca), 1)}) · ${fmtArea(AREA.get(f.ia + '|' + f.ca) || 0)}`;
+}
+function setFilter(f) {
+  state.filter = f;
+  if (f && !state.ov.on) { state.ov.on = true; $('#chk-ov').checked = true; }
+  rerender(['ov']); matrixHTML();
+  if (f) {
+    const b = L.latLngBounds([]);
+    D.ov.a.forEach(([a, c], i) => { if (OLD[a].iaBas === f.ia && NEW[c].caBas === f.ca) { const bb = L_OV.bbox[i]; b.extend([bb[0], bb[1]]); b.extend([bb[2], bb[3]]); } });
+    if (b.isValid()) map.fitBounds(b, { padding: [20, 20], maxZoom: 16 });
+  }
+}
+$('#mx').addEventListener('click', (e) => {
+  const td = e.target.closest('td.has'); if (!td) return;
+  const f = { ia: +td.dataset.ia, ca: +td.dataset.ca };
+  setFilter(state.filter && state.filter.ia === f.ia && state.filter.ca === f.ca ? null : f);
+});
+$('#mx').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('td.has')) { e.preventDefault(); e.target.click(); } });
+$('#mxclear').addEventListener('click', () => setFilter(null));
+
+const BUCKETS = [['até −25%', -Infinity, -0.25, -0.44], ['−25% a −5%', -0.25, -0.05, -0.17], ['−5% a +5%', -0.05, 0.05, 0],
+  ['+5% a +25%', 0.05, 0.25, 0.2], ['+25% a +50%', 0.25, 0.5, 0.38], ['+50% a +100%', 0.5, 1, 0.75], ['acima de +100%', 1, Infinity, 1.4]];
 function summaryHTML() {
-  const a = D.stats.camax, tot = Object.values(a).reduce((x, y) => x + y, 0);
-  const rows = [['Ampliou', CLASSE.amp.color], ['Manteve', CLASSE.man.color], ['Reduziu', CLASSE.red.color], ['Sem comparação', SEM.color]];
-  $('#summary').innerHTML = `<div class="bar" role="img" aria-label="Área por resultado">${rows.map(([k, c]) => `<span style="width:${(a[k] || 0) / tot * 100}%;background:${c}"></span>`).join('')}</div>
-    <div class="barleg">${rows.map(([k, c]) => `<div><i style="background:${c}"></i>${k}<b>${fmt(a[k] || 0, 1)} km²</b></div>`).join('')}</div>
-    <p class="note">Área dos quarteirões em cada situação, comparando o CA máximo do plano novo com o CA equivalente do antigo. Ligue a camada “Dinâmica” para ver onde.</p>`;
+  const area = BUCKETS.map(() => 0); let sem = 0;
+  D.ov.a.forEach(([a, b, ar]) => {
+    const g = gainOf(OLD[a].iaBas, NEW[b].caBas);
+    if (g == null) { sem += ar; return; }
+    const k = BUCKETS.findIndex(([, lo, hi]) => (lo === -Infinity ? g <= hi : hi === Infinity ? g > lo : lo === -0.05 ? g >= lo && g <= hi : g > lo && g <= hi));
+    area[k < 0 ? 2 : k] += ar;
+  });
+  const rows = BUCKETS.map(([lab, , , mid], i) => [lab, gainColor(mid), area[i]]).concat([['Sem comparação', SEM.color, sem]]);
+  const tot = rows.reduce((x, r) => x + r[2], 0);
+  $('#summary').innerHTML = `<div class="bar" role="img" aria-label="Área por faixa de ganho">${rows.map(([, c, a]) => `<span style="width:${a / tot * 100}%;background:${c}"></span>`).join('')}</div>
+    <div class="barleg">${rows.map(([k, c, a]) => `<div><i style="background:${c}"></i>${k}<b>${fmt(a / 1e6, 1)} km²</b></div>`).join('')}</div>
+    <p class="note">Área de quarteirões em cada faixa de ganho de área privativa com o potencial básico.</p>`;
 }
 
 /* ---------- controles ---------- */
@@ -880,18 +942,16 @@ function bindLayer(name) {
 ['old', 'new', 'ov'].forEach(bindLayer);
 $('#chk-st').addEventListener('change', (e) => { state.st = e.target.checked; if (state.st) stGroup.addTo(map); else map.removeLayer(stGroup); updateLabels(); });
 $('#chk-tiles').addEventListener('change', (e) => { state.tiles = e.target.checked; setTiles(state.tiles); });
-function bindSeg(id, key, names) {
-  const g = $(id);
-  g.addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    state[key] = b.dataset.v;
-    g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    if (key === 'omode' && !state.ov.on) { state.ov.on = true; $('#chk-ov').checked = true; }
-    rerender(names);
-  });
+function setEff() {
+  const a = parseFloat(String($('#ef-old').value).replace(',', '.')), b = parseFloat(String($('#ef-new').value).replace(',', '.'));
+  if (!(a > 0) || !(b > 0)) { $('#efmsg').textContent = 'Use valores maiores que zero (ex.: 1,2 e 0,8).'; return; }
+  $('#efmsg').textContent = '';
+  EF.old = a; EF.new = b;
+  $('#f-old').textContent = fmt(a); $('#f-new').textContent = fmt(b);
+  rerender(['old', 'new', 'ov']); matrixHTML(); summaryHTML();
+  if (last) query(last.ll, { label: last.label, silent: true });
 }
-bindSeg('#mode-plan', 'mode', ['old', 'new']);
-bindSeg('#mode-ov', 'omode', ['ov']);
+['#ef-old', '#ef-new'].forEach((id) => $(id).addEventListener('change', setEff));
 $('#chip').addEventListener('click', () => { $('#consulta').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#chip').hidden = true; });
 map.on('zoomend', () => { styleStreets(); });
 map.on('moveend', updateLabels);
@@ -903,9 +963,9 @@ new MutationObserver(themeChanged).observe(document.documentElement, { attribute
 if (STANDALONE) {
   $('#export').hidden = false;
   const props = {
-    old: (i) => { const o = OLD[i]; return { cod_subun: o.cod, mz: o.mz, ueu: o.ueu, subunidade: o.sub, densidade: o.dens, atividade: o.ativ, indice: o.iaCod, volumetria: o.volCod, zona_uso: o.zona, ia_basico: o.iaBas, ia_maximo: o.iaMax, ca_eq_basico: o.caBas, ca_eq_maximo: o.caMax, altura_max: o.alt, altura_txt: o.altTxt }; },
-    new: (i) => { const n = NEW[i]; return { zot: n.zot, bairro: n.bairro, setor: n.setor, upl: n.upl, zot_projeto: n.zotProj, ca_basico: n.caBas, ca_maximo: n.caMax, altura_max: n.alt, ca_basico_txt: n.r.ca_bas_txt, ca_maximo_txt: n.r.ca_max_txt, altura_txt: n.r.alt_txt }; },
-    ov: (i) => { const [a, b] = D.ov.a[i], o = OLD[a], n = NEW[b], d = OV[i]; return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ca_eq_bas_ant: o.caBas, ca_eq_max_ant: o.caMax, alt_ant: o.alt, ca_bas_novo: n.caBas, ca_max_novo: n.caMax, alt_novo: n.alt, d_ca_bas: d.dB, d_ca_max: d.dM, d_alt: d.dA, din_ca_max: d.cM, din_ca_bas: d.cB, din_alt: d.cA }; },
+    old: (i) => { const o = OLD[i]; return { cod_subun: o.cod, mz: o.mz, ueu: o.ueu, subunidade: o.sub, densidade: o.dens, atividade: o.ativ, indice: o.iaCod, volumetria: o.volCod, zona_uso: o.zona, ia_basico: o.iaBas, ia_maximo: o.iaMax, priv_basica: privOld(o.iaBas), altura_max: o.alt, altura_txt: o.altTxt }; },
+    new: (i) => { const n = NEW[i]; return { zot: n.zot, bairro: n.bairro, setor: n.setor, upl: n.upl, zot_projeto: n.zotProj, ca_basico: n.caBas, ca_maximo: n.caMax, priv_basica: privNew(n.caBas), altura_max: n.alt, ca_basico_txt: n.r.ca_bas_txt, ca_maximo_txt: n.r.ca_max_txt, altura_txt: n.r.alt_txt }; },
+    ov: (i) => { const [a, b, ar] = D.ov.a[i], o = OLD[a], n = NEW[b], d = dyn(o, n); return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ia_basico_ant: o.iaBas, ca_basico_novo: n.caBas, ef_ant: EF.old, ef_novo: EF.new, priv_ant: privOld(o.iaBas), priv_novo: privNew(n.caBas), ganho_bas_pct: d.gB == null ? null : Math.round(d.gB * 1000) / 10, ganho_max_pct: d.gM == null ? null : Math.round(d.gM * 1000) / 10, alt_ant: o.alt, alt_novo: n.alt, area_m2: ar }; },
   };
   document.querySelectorAll('[data-exp]').forEach((b) => b.addEventListener('click', () => {
     const k = b.dataset.exp, lay = LAYERS[k];
@@ -923,6 +983,7 @@ map.fitBounds(lb, { padding: [10, 10] });
 styleStreets();
 rerender(['old', 'new', 'ov']);
 summaryHTML();
+matrixHTML();
 $('#gerado').textContent = `Dados extraídos em ${D.meta.gerado}.`;
 query(L.latLng(D.meta.exemplo[0], D.meta.exemplo[1]), { label: 'Exemplo: quarteirão no Menino Deus', silent: true });
 })();

@@ -100,7 +100,7 @@ vg = simp(ov, 0.3)
 keep = [i for i, g in enumerate(vg) if g is not None and not g.is_empty]
 payload['ov'] = {
     'g': [enc_poly(vg.iloc[i]) for i in keep],
-    'a': [[int(ov.id_ant.iloc[i]), int(ov.id_novo.iloc[i])] for i in keep],
+    'a': [[int(ov.id_ant.iloc[i]), int(ov.id_novo.iloc[i]), round(float(ov.area_m2.iloc[i]))] for i in keep],
 }
 area = ov.groupby('din_camax').area_m2.sum().div(1e6).round(2).to_dict()
 area_alt = ov.groupby('din_alt').area_m2.sum().div(1e6).round(2).to_dict()
