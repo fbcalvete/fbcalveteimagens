@@ -1,4 +1,4 @@
-# Agente de Aéreo & Pontos
+# Agente de Passagens Aéreas
 
 Agente de IA que roda **automaticamente 2x por dia** (08:00 e 20:00, horário de
 Brasília) e faz duas verificações. Ele **só envia e-mail** para
@@ -7,16 +7,7 @@ silêncio no resto do tempo.
 
 ## O que ele monitora
 
-### 1. Pontos em compras de varejo — site [Pontos pra Voar](https://pontospravoar.com)
-Procura promoções **vigentes** de acúmulo de pontos em lojas de varejo e
-eletrodomésticos (Casas Bahia, Ponto, Fast Shop, Magazine Luiza/Magalu, Amazon,
-Mercado Livre, Extra, etc.).
-
-- **Programas válidos:** **somente Livelo e Esfera** (demais programas são ignorados).
-- **Gatilho de alerta:** alguma loja pagando **≥ 8 pontos por real** em Livelo ou Esfera.
-- **No e-mail:** loja, programa (Livelo/Esfera), quantos pontos por real e o link da promoção.
-
-### 2. Passagem de Carnaval 2027 — site [MaxMilhas](https://www.maxmilhas.com.br)
+### 1. Passagem de Carnaval 2027
 Monitora uma passagem específica:
 
 | Campo | Valor |
@@ -30,7 +21,7 @@ Monitora uma passagem específica:
 - **Gatilho de alerta:** total ida+volta **< R$ 1.000**.
 - **No e-mail:** preço encontrado, companhia/horários (se disponível) e o link.
 
-### 3. Fim de semana POA ↔ São Paulo/Congonhas (CGH)
+### 2. Fim de semana POA ↔ São Paulo/Congonhas (CGH)
 Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
 **sexta → segunda seguinte** (3 noites):
 
@@ -46,7 +37,7 @@ Monitora um fim de semana **em qualquer data**, desde que seja sempre um par
 - **Gatilho de alerta:** total ida+volta **< R$ 500**.
 - **No e-mail:** datas exatas (sexta/segunda), preço, companhia, horários e link.
 
-### Regra dos voos (Verificações 2 e 3)
+### Regra dos voos
 O agente consulta Google Flights, Kayak, Skyscanner, MaxMilhas/Decolar, sites
 das cias e blogs de promoção, e usa o menor total ida+volta. **Aceita preço sem
 confirmação de horário/cia** (marca `[a confirmar]`; a confirmação final é
@@ -56,8 +47,7 @@ link do alerta abre a busca já nas datas exatas.
 
 ### Anti-repetição
 Antes de enviar, o agente lê no Gmail os alertas dos últimos 7 dias e descarta
-o que já foi avisado. Só reenvia se a oferta **melhorar** (mais pontos/real ou
-preço pelo menos R$ 30 menor).
+o que já foi avisado. Só reenvia se o preço **cair pelo menos R$ 30**.
 
 ## Como está montado
 
@@ -76,7 +66,9 @@ preço pelo menos R$ 30 menor).
 - **Sem novidade = sem e-mail.** Se nada bater o critério, o agente encerra sem
   mandar nada. Você não recebe "relatório de que não há nada".
 - **Sem repetição.** O mesmo alerta não chega duas vezes em 7 dias, a menos que
-  a oferta melhore.
+  o preço caia.
+- **Pontos de varejo:** monitoramento **desativado** em 29/10/2026 (ver histórico
+  do git se quiser reativar).
 - **Alertas de voo podem vir "a confirmar".** Os sites de passagem são dinâmicos;
   o agente prefere avisar com um preço indicativo a ficar em silêncio. Confira
   no link antes de comprar.
