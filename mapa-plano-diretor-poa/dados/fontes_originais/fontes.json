@@ -1,0 +1,52 @@
+{
+ "limite_municipal.geojson": {
+  "url": "https://mapaspoa-prod-2020.procempa.com.br/arcgis/rest/services/SMAMS_DM/TM_POA_SMAMS_Plano_Diretor/MapServer/18",
+  "baixado_em": "2026-10-29 02:10 UTC",
+  "feicoes": 39
+ },
+ "logradouros.geojson": {
+  "url": "https://mapaspoa-prod-2020.procempa.com.br/arcgis/rest/services/SMAMS_DM/TM_POA_SMAMS_Plano_Diretor/MapServer/8",
+  "baixado_em": "2026-10-29 02:12 UTC",
+  "feicoes": 33020
+ },
+ "luos_zoneamento_min.geojson": {
+  "url": "https://services3.arcgis.com/ArYIEKBXSSNP3WQG/arcgis/rest/services/zoneamento_min/FeatureServer/0",
+  "baixado_em": "2026-10-29 02:18 UTC",
+  "feicoes": 8364
+ },
+ "numero_imovel.geojson": {
+  "url": "https://mapaspoa-prod-2020.procempa.com.br/arcgis/rest/services/SMAMS_DM/TM_POA_SMAMS_Plano_Diretor/MapServer/5",
+  "baixado_em": "2026-10-29 02:51 UTC",
+  "feicoes": 168168
+ },
+ "numero_predial.geojson": {
+  "url": "https://mapaspoa-prod-2020.procempa.com.br/arcgis/rest/services/SMAMS_DM/TM_POA_SMAMS_Plano_Diretor/MapServer/3",
+  "baixado_em": "2026-10-29 02:40 UTC",
+  "feicoes": 41394
+ },
+ "pddua_subunidades_dmweb.geojson": {
+  "url": "https://mapaspoa-prod-2020.procempa.com.br/arcgis/rest/services/SMAMS_DM/TM_POA_SMAMS_Plano_Diretor/MapServer/16",
+  "baixado_em": "2026-10-29 02:09 UTC",
+  "feicoes": 1549
+ },
+ "pdus_anexo5_zonas_quarteiroes.geojson": {
+  "url": "https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/Hosted/pdus_anexo5_zonasdeocupacao/FeatureServer/0",
+  "baixado_em": "2026-10-29 02:16 UTC",
+  "feicoes": 14543
+ },
+ "tab_pddua_atv_anexo5_1.json": {
+  "url": "https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/Hosted/PDDUA_ATVS_ANEXO_5_1/FeatureServer/0",
+  "baixado_em": "2026-10-29 02:16 UTC",
+  "feicoes": 28
+ },
+ "tab_pddua_ia_anexo6.json": {
+  "url": "https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/Hosted/pddua_ia_anexo_6/FeatureServer/0",
+  "baixado_em": "2026-10-29 02:16 UTC",
+  "feicoes": 24
+ },
+ "tab_pddua_vol_anexo7_1.json": {
+  "url": "https://gis-smamus.portoalegre.rs.gov.br/server/rest/services/Hosted/pddua_vol_anexo_7_1/FeatureServer/0",
+  "baixado_em": "2026-10-29 02:16 UTC",
+  "feicoes": 18
+ }
+}

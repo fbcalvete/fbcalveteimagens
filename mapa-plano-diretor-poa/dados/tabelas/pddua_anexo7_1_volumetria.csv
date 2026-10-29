@@ -1,0 +1,19 @@
+cod,codigo,obs_max,alt_max,alt_base,tax_ocup,obs_base,alt_div,obs_tax,obs_div,alt_max_n
+1,1,,9,-,"66,60%",-,9,"66,6%",9,9.0
+2,2,,9,4,75%,4,9,75%,9,9.0
+3,3,,"12,5",-,75%,-,"12,5",75%,"12,5",12.5
+3A,03a,,"12,5",-,75%,-,9,75%,9,12.5
+4,4,,"12,5",9,75% e 90%,9,"12,5",Os terrenos com frente para as vias constantes no anexo 7.2 terão taxa de ocupação de 90% na base e 75% no corpo,"12,5",12.5
+5,5,,18,4,75% e 90%,4,"12,5",Os terrenos com frente para as vias constantes no anexo 7.2 terão taxa de ocupação de 90% na base e 75% no corpo,"12,5",18.0
+6,6,,18,4,75%,4,9,75%,9,18.0
+7,7,,18,-,75%,-,18,75%,18,18.0
+8,8,,18,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,18,"Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,18.0
+9,9,,42,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,"12,5 m e 18 m (Consultar Anexo 7.1 do PDDUA)","Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,42.0
+11,11,,52,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,"12,5 m e 18 m (Consultar Anexo 7.1 do PDDUA)","Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,52.0
+13,13,,52,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,18,"Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,52.0
+15,15,,33,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,"12,5 m e 18 m (Consultar Anexo 7.1 do PDDUA)","Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,33.0
+17,17,,27,4 m e 9 m (Consultar Anexo 7.1 do PDDUA),75% e 90%,9,"12,5 m e 18 m (Consultar Anexo 7.1 do PDDUA)","Os terrenos com frente para as vias constantes no anexo 7.2 e na área central terão altura na divisa de 18m e na base de 9m, e taxa de ocupação de 90% na base e 75% no corpo",18,27.0
+19,19,,Consultar Anexo 7.1 do PDDUA,9,75% e 90%,9,Consultar Anexo 7.1 do PDDUA,Consultar Anexo 7.1 do PDDUA,Consultar Anexo 7.1 do PDDUA,
+21,21,,9,-,20%,-,9,20%,9,9.0
+23,23,,9,-,50%,-,9,50%,9,9.0
+25,25,,Regime Urbanístico Próprio,-,-,-,-,-,-,

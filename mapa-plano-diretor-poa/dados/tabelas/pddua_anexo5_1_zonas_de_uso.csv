@@ -1,0 +1,29 @@
+zonas_uso,ga,cod
+"Área Predominantemente Residencial, Centro Histórico",1,1
+Mista 01,3,3
+"Mista 02, Centro Histórico",5,5
+"Mista 03, Centro Histórico",7,7
+Mista 04,9,9
+Mista 05,11,11
+Área Predominantemente Produtiva,13,13
+Área de Interesse Cultural - Área Predominantemente Residencial,15.1,15.1
+Área de Interesse Cultural - Mista 01,15.3,15.3
+Remanescente das Antigas Áreas Funcionais,15.2,15.2
+Área de Interesse Cultural - Mista 02,15.5,15.5
+Área de Interesse Cultural - Mista 03,15.7,15.7
+Área de Interesse cultural - Parque Urbano,15.9,15.9
+Área de Ambiência Cultural - Área Predominantemente Residencial,16.1,16.1
+Área de Ambiência Cultural - Mista 01,16.3,16.3
+Área de Ambiência Cultural - Mista 02,16.5,16.5
+Área de Ambiência Cultural - Mista 03,16.7,16.7
+Área de Ambiência Cultural - Mista 04,16.9,16.9
+Área de Interesse Institucional,17,17
+Proteção do Ambiente Natural,19.1,19.1
+Parque Natural,19.2,19.2
+Reserva Biológica,19.3,19.3
+Lei da Lomba do Pinheiro,20,20
+Área de Desenvolvimento Diversificado,21,21
+Área de Produção Primária,23,23
+Corredor Agroindustrial,25,25
+Área com Potencial de Intensiva,27,27
+Regime Urbanístico Conforme Legislação,99.99,99.99
