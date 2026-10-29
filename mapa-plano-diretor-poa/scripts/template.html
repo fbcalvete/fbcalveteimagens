@@ -235,7 +235,7 @@ details.more p { margin: 6px 0 0; }
         </div>
         <div class="lyr">
           <input type="checkbox" id="chk-ov" checked aria-label="Mostrar dinâmica">
-          <label class="nm" for="chk-ov"><i class="sw" style="background:linear-gradient(90deg,#c00000,#efc100,#dfe503,#275317)"></i><span><b>Dinâmica</b><em>ganho de área privativa</em></span></label>
+          <label class="nm" for="chk-ov"><i class="sw" style="background:linear-gradient(90deg,#a50f15 0%,#f7a08a 46%,#f2cf00 46%,#f2cf00 54%,#b7e2a8 54%,#0b4d20 100%)"></i><span><b>Dinâmica</b><em>ganho de área privativa</em></span></label>
           <div class="ctl"><input type="range" id="op-ov" min="0.1" max="0.95" step="0.05" value="0.8" aria-label="Opacidade da dinâmica"></div>
         </div>
         <div class="lyr">
@@ -420,8 +420,9 @@ function ramp(anch, v) {   /* interpolacao linear entre ancoras [valor, cor], co
   }
   return anch[anch.length - 1][1];
 }
-const GANHO = D.cores.ganho;   /* cores da tabela IA x CA (ganho em %) */
-const gainColor = (g) => ramp(GANHO, g * 100);
+/* escala divergente: vermelho = perde, amarelo = so variacao 0%, verde = ganha (ancoras em %) */
+const GANHO = D.cores.ganho;
+const gainColor = (g) => { const v = g * 100; return Math.abs(v) < GANHO.tol ? GANHO.zero : ramp(v < 0 ? GANHO.neg : GANHO.pos, v); };
 const privColor = (v) => ramp(D.cores.priv, v);
 const inkOn = (hex) => { const [r, g, b] = hex2rgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1b1b1b' : '#ffffff'; };
 const SEM = { color: '#b9bcc6', label: 'Sem comparação (IA ou CA não numérico)' };
@@ -875,18 +876,23 @@ sugg.addEventListener('mousedown', (ev) => { const li = ev.target.closest('li');
 qIn.addEventListener('blur', () => setTimeout(() => { sugg.hidden = true; }, 150));
 
 /* ---------- legenda, matriz e resumo ---------- */
-const G_MIN = GANHO[0][0], G_MAX = GANHO[GANHO.length - 1][0];
+const G_MIN = GANHO.neg[0][0], G_MAX = GANHO.pos[GANHO.pos.length - 1][0];
 const gPos = (v) => ((v - G_MIN) / (G_MAX - G_MIN)) * 100;
+/* faixa amarela estreita no 0%, com quebra seca para o vermelho e o verde */
+const G_GRAD = (() => {
+  const z = gPos(0), w = 1.2;
+  return [...GANHO.neg.map(([v, c]) => `${c} ${Math.min(gPos(v), z - w).toFixed(1)}%`), `${GANHO.zero} ${(z - w).toFixed(1)}%`,
+    `${GANHO.zero} ${(z + w).toFixed(1)}%`, ...GANHO.pos.map(([v, c]) => `${c} ${Math.max(gPos(v), z + w).toFixed(1)}%`)].join(',');
+})();
 function legendHTML() {
   const parts = [];
   const list = (items) => `<ul>${items.map((c) =>
     `<li><i style="background:${c.color};${c.border ? `border:2px dashed ${c.border}` : ''}"></i><span>${esc(c.label)}</span></li>`).join('')}</ul>`;
   if (state.ov.on) {
-    const grad = GANHO.map(([v, c]) => `${c} ${gPos(v).toFixed(1)}%`).join(',');
-    const ticks = [G_MIN, 0, 33, 60, 100, G_MAX].map((v) => `<span style="left:${gPos(v).toFixed(1)}%">${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}%</span>`).join('');
+    const ticks = [G_MIN, -25, 0, 25, 50, 100, G_MAX].map((v) => `<span style="left:${gPos(v).toFixed(1)}%">${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}%</span>`).join('');
     parts.push(`<details open><summary>Dinâmica · ganho de área privativa (potencial básico)</summary>
-      <div class="gbar" style="background:linear-gradient(90deg,${grad})"></div><div class="gticks">${ticks}</div>
-      <p class="note">Cores da tabela IA × CA. Abaixo de ${G_MIN}% fica no vermelho mais escuro; acima de +${G_MAX}%, no verde mais escuro.</p>
+      <div class="gbar" style="background:linear-gradient(90deg,${G_GRAD})"></div><div class="gticks">${ticks}</div>
+      <p class="note">Vermelho: perde área privativa. <b>Amarelo: só variação 0%.</b> Verde: ganha, mais escuro quanto maior o ganho. Abaixo de −${Math.abs(G_MIN)}% fica no vermelho mais escuro; acima de +${G_MAX}%, no verde mais escuro.</p>
       ${list([SEM])}</details>`);
   }
   if (state.new.on) parts.push(`<details open><summary>Plano novo · CA básico</summary>${list(LEG.new)}</details>`);
@@ -939,14 +945,16 @@ $('#mx').addEventListener('click', (e) => {
 $('#mx').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('td.has')) { e.preventDefault(); e.target.click(); } });
 $('#mxclear').addEventListener('click', () => setFilter(null));
 
-const BUCKETS = [['até −25%', -Infinity, -0.25, -0.44], ['−25% a −5%', -0.25, -0.05, -0.17], ['−5% a +5%', -0.05, 0.05, 0],
-  ['+5% a +25%', 0.05, 0.25, 0.2], ['+25% a +50%', 0.25, 0.5, 0.38], ['+50% a +100%', 0.5, 1, 0.75], ['acima de +100%', 1, Infinity, 1.4]];
+/* faixas do resumo: [rotulo, de, ate, ganho que da a cor]; "0%" e a mesma tolerancia da cor amarela */
+const Z = GANHO.tol / 100;
+const BUCKETS = [['até −25%', -Infinity, -0.25, -0.44], ['−25% a 0%', -0.25, -Z, -0.12], ['0% (sem variação)', -Z, Z, 0],
+  ['0% a +25%', Z, 0.25, 0.12], ['+25% a +50%', 0.25, 0.5, 0.38], ['+50% a +100%', 0.5, 1, 0.75], ['acima de +100%', 1, Infinity, 1.4]];
 function summaryHTML() {
   const area = BUCKETS.map(() => 0); let sem = 0;
   D.ov.a.forEach(([a, b, ar]) => {
     const g = gainOf(OLD[a].iaBas, NEW[b].caBas, NEW[b].rural);
     if (g == null) { sem += ar; return; }
-    const k = BUCKETS.findIndex(([, lo, hi]) => (lo === -Infinity ? g <= hi : hi === Infinity ? g > lo : lo === -0.05 ? g >= lo && g <= hi : g > lo && g <= hi));
+    const k = Math.abs(g) < Z ? 2 : BUCKETS.findIndex(([, lo, hi], i) => i !== 2 && (lo === -Infinity ? g <= hi : g > lo && g <= hi));
     area[k < 0 ? 2 : k] += ar;
   });
   const rows = BUCKETS.map(([lab, , , mid], i) => [lab, gainColor(mid), area[i]]).concat([['Sem comparação', SEM.color, sem]]);

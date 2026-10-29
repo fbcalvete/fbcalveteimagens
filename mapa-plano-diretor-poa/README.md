@@ -40,7 +40,7 @@ Abra `mapa_planos_diretores_poa.html` com duplo clique (Chrome, Edge, Firefox ou
 | Contorno | Mostra só o limite das zonas, para ver um plano sobre o outro. |
 | Barra de opacidade | Transparência de cada camada. |
 | Cores dos planos | Plano antigo pelo **IA básico**, plano novo pelo **CA básico**. Os dois usam a mesma escala de área privativa por m² de terreno, então a mesma cor indica a mesma área privativa. Exemplo: IA 1,3 (1,56) e CA 2,0 (1,60). |
-| Cores da dinâmica | Ganho de área privativa com as **cores da tabela IA × CA do estudo**, do vermelho (−44% ou menos) ao verde-escuro (+140% ou mais). |
+| Cores da dinâmica | Ganho de área privativa em escala divergente: **vermelho** quando perde (mais escuro até −60%), **amarelo só na variação 0%** e **verde** quando ganha (claro a partir de +1%, verde-escuro em +150% ou mais). Paleta em `scripts/cores.json`. |
 | Eficiência de projeto | Campos editáveis (padrão 1,2 e 0,8). Ao mudar, o mapa, a matriz e a consulta são recalculados. |
 | Matriz IA × CA | Mostra todas as combinações reais, com o ganho e a área. Clique numa célula para ver no mapa só aquela combinação. |
 | Passar o mouse | Mostra o **ganho percentual**, o **IA anterior** e o **CA futuro** sob o cursor. |

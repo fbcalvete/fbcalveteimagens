@@ -32,6 +32,12 @@ def ramp(anch, v):
     return anch[-1][1]
 
 
+def gcolor(g):
+    """Ganho (%) -> cor: vermelhos se perde, amarelo so na variacao nula, verdes se ganha (mesma regra do HTML)."""
+    G = CORES['ganho']
+    return G['zero'] if abs(g) < G['tol'] else ramp(G['neg'] if g < 0 else G['pos'], g)
+
+
 def ok(v):
     return v is not None and not (isinstance(v, float) and np.isnan(v)) and v > 0
 
@@ -129,7 +135,8 @@ items = []
 for r in ov.itertuples():
     g = r.ganho_bas
     has = g == g and g is not None
-    sid = style(f'g_{round(g)}'.replace('-', 'm') if has else 'g_sem', ramp(CORES['ganho'], g) if has else CINZA, 0xc0)
+    cor = gcolor(g) if has else CINZA
+    sid = style('g_' + cor[1:] if has else 'g_sem', cor, 0xc0)
     nome = (f'{"+" if g > 0 else ""}{fmt(g)}%' if has else 'Sem comparação') + f' · IA {fmt(r.ia_bas)} → CA {fmt(r.ca_bas)}'
     desc = table([('Ganho de área privativa (básico)', f'{"+" if has and g > 0 else ""}{fmt(g)}%' if has else 'sem comparação'),
                   ('IA anterior → CA futuro', f'{fmt(r.ia_bas)} → {fmt(r.ca_bas)}'),

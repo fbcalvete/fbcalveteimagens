@@ -1,5 +1,5 @@
 {
- "_doc": "Paletas usadas no HTML e no KMZ. zu/zot = cores de referencia das zonas (mapa oficial). ganho = cores da tabela IA x CA do estudo [ganho %, cor], interpoladas entre ancoras. priv = escala de area privativa potencial (m2 privativo por m2 de terreno), igual para os dois planos.",
+ "_doc": "Paletas usadas no HTML e no KMZ. zu/zot = cores de referencia das zonas (mapa oficial). ganho = escala divergente do ganho de area privativa (%): neg = vermelhos (perde), pos = verdes (ganha), zero = amarelo so para variacao nula (|ganho| < tol %); interpolacao entre ancoras [ganho %, cor], saturando nas pontas. priv = escala de area privativa potencial (m2 privativo por m2 de terreno), igual para os dois planos.",
  "zu": {
   "1": "#f3e27c",
   "3": "#f6c063",
@@ -64,80 +64,58 @@
   "ZOT 16": "#aacd4e",
   "POLÍGONO VETADO": "#8a8f99"
  },
- "ganho": [
-  [
-   -44,
-   "#c00000"
+ "ganho": {
+  "zero": "#f2cf00",
+  "tol": 0.5,
+  "neg": [
+   [
+    -60,
+    "#67000d"
+   ],
+   [
+    -40,
+    "#a50f15"
+   ],
+   [
+    -25,
+    "#d42a20"
+   ],
+   [
+    -10,
+    "#ef5a3c"
+   ],
+   [
+    -0.5,
+    "#f7a08a"
+   ]
   ],
-  [
-   -33,
-   "#cb3000"
-  ],
-  [
-   -30,
-   "#cf3f00"
-  ],
-  [
-   -17,
-   "#dd7800"
-  ],
-  [
-   -16,
-   "#de7c00"
-  ],
-  [
-   0,
-   "#efc100"
-  ],
-  [
-   3,
-   "#f2cc00"
-  ],
-  [
-   5,
-   "#f5d800"
-  ],
-  [
-   23,
-   "#f0f301"
-  ],
-  [
-   25,
-   "#edf101"
-  ],
-  [
-   26,
-   "#ebef02"
-  ],
-  [
-   33,
-   "#dfe503"
-  ],
-  [
-   50,
-   "#c2cf06"
-  ],
-  [
-   54,
-   "#bbc907"
-  ],
-  [
-   60,
-   "#b1c108"
-  ],
-  [
-   85,
-   "#879f0c"
-  ],
-  [
-   100,
-   "#6c8a0f"
-  ],
-  [
-   140,
-   "#275317"
+  "pos": [
+   [
+    0.5,
+    "#b7e2a8"
+   ],
+   [
+    10,
+    "#97d38a"
+   ],
+   [
+    25,
+    "#6bbf6a"
+   ],
+   [
+    50,
+    "#3fa04e"
+   ],
+   [
+    100,
+    "#1f7a35"
+   ],
+   [
+    150,
+    "#0b4d20"
+   ]
   ]
- ],
+ },
  "priv": [
   [
    0,
