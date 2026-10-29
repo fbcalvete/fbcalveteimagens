@@ -104,7 +104,10 @@ for r in old.itertuples():
                   ('IA básico / máximo', f'{fmt(r.ia_bas)} / {fmt(r.ia_max)}'),
                   ('CA equivalente (×1,5)', f'{fmt(r.caeq_bas)} / {fmt(r.caeq_max)}'),
                   ('Altura máxima', fmt(r.alt_max, ' m') if r.alt_max == r.alt_max and r.alt_max is not None else fmt(r.alt_txt)),
-                  ('Taxa de ocupação', fmt(r.tx_ocup)), ('Regime definido por', fmt(r.regime_ref) if r.regime_ref else '—'),
+                  ('Taxa de ocupação', fmt(r.tx_ocup)), ('Fonte do IA', fmt(r.ia_fonte)),
+                  ('Norma do IA', fmt(r.ia_lei) + (' · ' + html.escape(r.ia_lei_obs) if isinstance(r.ia_lei_obs, str) else '')
+                   if isinstance(r.ia_lei, str) else '—'),
+                  ('Regime definido por (DMWeb)', fmt(r.regime_ref) if r.regime_ref else '—'),
                   ('Teto do IA (Anexo 6)', fmt(r.ia_teto))])
     items.append(placemark(f'IA {fmt(r.ia_bas)} · {r.zona_uso}', sid, desc, r.geometry, False))
 folder('Plano antigo · PDDUA · cor pelo IA básico', items, False)
@@ -132,6 +135,7 @@ for r in ov.itertuples():
                   ('IA anterior → CA futuro', f'{fmt(r.ia_bas)} → {fmt(r.ca_bas)}'),
                   ('Área privativa por m² de terreno', f'{fmt(r.priv_ant)} → {fmt(r.priv_novo)}'),
                   ('Ganho com o potencial máximo', f'{fmt(r.ganho_max)}%'),
+                  ('Fonte do IA anterior', fmt(r.ia_fonte) + (f' ({fmt(r.ia_lei)})' if isinstance(r.ia_lei, str) else '')),
                   ('Altura', f'{fmt(r.alt_ant, " m")} → {fmt(r.alt_novo, " m")}'),
                   ('Antigo', fmt(r.zona_uso)), ('Novo', fmt(r.zot))])
     items.append(placemark(nome, sid, desc, r.geometry, True))

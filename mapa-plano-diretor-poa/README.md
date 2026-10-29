@@ -62,9 +62,9 @@ O painel informa qual dos três casos ocorreu.
 | `dados/pdus_novo_zonas.gpkg` / `.geojson` | **GIS do plano novo:** 8.414 polígonos de ZOT da LUOS sancionada, com o regime de cada ZOT. |
 | `dados/dinamica_sobreposicao.gpkg` / `.geojson` | **GIS sobreposto:** 12.516 peças da interseção antigo × novo, com atributos dos dois planos, deltas e classes. |
 | `dados/planos_diretores_poa.kmz` | As 3 camadas para o **Google Earth**, com cores por zona e ficha em cada polígono. |
-| `dados/tabelas/*.csv` | Anexos 5.1, 6 e 7.1 do PDDUA, regime por ZOT, **matriz IA × CA básico** (`matriz_ia_ca_basico.csv`) e **dinâmica por bairro**. |
-| `dados/fontes_originais/` | Cópia comprimida dos dados brutos baixados, com URLs e horário (`fontes.json`). |
-| `scripts/` | Download, processamento e geração do HTML/KMZ (reprodutível). |
+| `dados/tabelas/*.csv` | Anexos 5.1, 6 e 7.1 do PDDUA, regime por ZOT, **matriz IA × CA básico** (`matriz_ia_ca_basico.csv`), **dinâmica por bairro** e **IA das leis específicas** (`ia_leis_especificas.csv`). |
+| `dados/fontes_originais/` | Cópia comprimida dos dados brutos baixados, com URLs e horário (`fontes.json`), e o link de cada lei e decreto consultado (`leis_especificas_fontes.csv`). |
+| `scripts/` | Download, processamento e geração do HTML/KMZ (reprodutível). `scripts/ia_leis_especificas.csv` é a tabela curada à mão, lida norma a norma. |
 
 Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Mapper e geojson.io.
 
@@ -77,7 +77,9 @@ Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Ma
 | `mz`, `ueu`, `subunid`, `cod_subun` | Macrozona, UEU e subunidade. |
 | `dens_cod`, `ativ_cod`, `ia_cod`, `vol_cod` | Códigos D·A·I·V do regime urbanístico. |
 | `zona_uso` | Zona de uso (Anexo 5.1). |
-| `ia_bas`, `ia_max` | Índice de aproveitamento básico e máximo (Anexo 6). |
+| `ia_bas`, `ia_max` | Índice de aproveitamento básico e máximo: do Anexo 6 ou, nos códigos não numéricos, da lei ou decreto específico. |
+| `ia_fonte` | `Anexo 6 (código do IA)`, `Lei ou decreto específico` ou `Sem IA numérico (norma verificada)`. |
+| `ia_lei`, `ia_lei_obs` | Norma e dispositivo de onde saiu o IA (ou que foi verificada e não fixa número), com observação. |
 | `solo_cria`, `tpc`, `quota` | Solo criado, TPC e quota ideal. |
 | `alt_max`, `alt_divisa`, `alt_base`, `tx_ocup` | Volumetria (Anexo 7.1). |
 | `caeq_bas`, `caeq_max` | IA × 1,5, comparável ao CA novo. |
@@ -102,7 +104,8 @@ Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Ma
 | `priv_ant`, `priv_novo` | Área privativa potencial por m² de terreno: IA × 1,2 e CA × 0,8. |
 | `ganho_bas` | Ganho de área privativa com o potencial básico, em %: (CA × 0,8) ÷ (IA × 1,2) − 1. Na Zona Rural é 0. |
 | `base_calc` | `LUOS (CA)` ou `PDDUA (IA)` (Zona Rural). |
-| `regime_ref`, `ia_teto` | Norma que define o regime quando o IA não é numérico, e o teto do Anexo 6. |
+| `ia_fonte`, `ia_lei` | De onde veio o IA antigo e a norma (ver plano antigo). |
+| `regime_ref`, `ia_teto` | Observação do DMWeb sobre o regime e o teto do Anexo 6 (códigos 23 e 25). |
 | `ganho_max` | O mesmo cálculo com IA máximo e CA máximo. |
 | `d_ca_bas`, `d_ca_max` | CA novo − CA equivalente antigo. |
 | `d_alt` | Altura nova − altura antiga (m). |
@@ -119,6 +122,8 @@ Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Ma
 | LUOS sancionada: mapa das ZOTs, com emendas e polígonos vetados | ArcGIS Online da SMAMUS, item "LUOS Zoneamento POA" (`services3.arcgis.com/ArYIEKBXSSNP3WQG/.../zoneamento_min`, atualizado em 01/09/2026) |
 | PDUS Anexo 5: regime por ZOT e quarteirões | `gis-smamus.portoalegre.rs.gov.br/.../Hosted/pdus_anexo5_zonasdeocupacao` (atualizado em 29/09/2026) |
 | Logradouros, números prediais e limite municipal | Mesmo serviço do DMWeb (camadas 8, 3, 5 e 18) |
+| Observações das subunidades (norma do regime) | Tabelas do DMWeb 2.0 no portal da SMAMUS (`dm_obs_tipo1`, `tipo2`, `tipo10`, `geral`) |
+| Leis e decretos específicos (IA das áreas sem código numérico) | Legislação Municipal de Porto Alegre (SAPL, `legislacao.portoalegre.rs.gov.br`, API `/api/norma/normajuridica`) e Diário Oficial (DOPA, `dopaonlineupload.procempa.com.br`) |
 
 O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento – PDUS") usa a camada `INTERSECT_PLAN_08_09_25_v2`, de set/2025. Ela é **anterior** às emendas da Câmara e aos vetos. Por isso a comparação usa o mapa da LUOS sancionada. A zona da versão pós-audiência fica registrada em `zot_projeto` e aparece na consulta quando difere.
 
@@ -138,7 +143,7 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
   O valor original da base fica em `ca_bas_gis` e a origem em `fonte_ca_bas`. Para mudar, edite `EMENDAS_CA_BAS` em `scripts/build_gis.py`.
 - **Zona Rural.** A LUOS (LC 1.076/2026, art. 22) diz que a Zona Rural não é ZOT e segue lei própria. A LC 775/15 (art. 5º, §1º) mantém nela o regime do PDDUA da subunidade (Área de Produção Primária, IA 0,1). Por isso o "CA" rural é o próprio IA do PDDUA, com a mesma base de cálculo e eficiência 1,2 nos dois lados: ganho 0%.
-- **IA não numérico.** O regime vem de norma própria. A norma de cada área vem das observações da subunidade, nas tabelas do DMWeb 2.0 publicadas no portal da SMAMUS (`dm_obs_tipo2`), e fica no campo `regime_ref`. Nos códigos 23 e 25 o Anexo 6 fixa teto de IA 2,5 (`ia_teto`).
+- **IA não numérico (códigos 23, 25, 39, 41 e 999).** O IA foi lido na lei ou decreto específico de cada área (seção 5, "IA das leis específicas"). A norma de partida vem das observações da subunidade no DMWeb 2.0 (`dm_obs_tipo2`, campo `regime_ref`). Depois foi conferida no texto integral do SAPL/DOPA e na busca de decretos posteriores pela ementa. O resultado está em `scripts/ia_leis_especificas.csv`, com norma, artigo e observação de cada subunidade. Quando a norma vale só para parte de uma subunidade, a chave leva o polígono (`MZ-UEU-SUB@id_ant`). Sem máximo na norma, o IA máximo é igual ao básico (sem solo criado). Nos códigos 23 e 25 que continuam sem número, o Anexo 6 fixa teto de IA 2,5 (`ia_teto`).
 - **Áreas fora do mapa da LUOS.** Onde o mapa sancionado não cobre (áreas ESPECIAIS, alguns quarteirões), a zona vem do Anexo 5. O campo `fonte` indica esses polígonos.
 - **Sobreposição.** Interseção geométrica em SIRGAS 2000 / UTM 22S (EPSG:31982). Peças menores que 10 m² foram descartadas.
 
@@ -146,7 +151,13 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
 ### Combinações de IA × CA básico que existem na cidade
 
-**IA do plano antigo (Anexo 6):** 0,1 · 0,2 · 0,5 · 0,65 · 1,0 · 1,3 · 1,6 · 1,9 · 2,4.
+**IA do plano antigo:**
+
+- **Anexo 6:** 0,1 · 0,2 · 0,5 · 0,65 · 1,0 · 1,3 · 1,6 · 1,9 · 2,4.
+- **Só em leis específicas:**
+  - 0,05 e 0,25 (Arado Velho, LC 935/22);
+  - 0,8 (LC 324/94);
+  - 3,0 (Hospitais Conceição e Mãe de Deus, LC 833/18 e LC 764/15).
 
 **CA básico do plano novo:**
 
@@ -164,39 +175,76 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
 Ganho de área privativa com o potencial básico e área de quarteirões em cada combinação, em km²:
 
-| IA \ CA | 0,3 | 0,5 | 1,5 | 2,0 | 2,4 | 3,0 | 3,6 | Zona Rural |
-|---|---|---|---|---|---|---|---|---|
-| **0,1** | +100% · 103,5 | +233% · 5,7 | +900% · 9,0 | +1.233% · 0,6 | | +1.900% · 0,05 | | **0% · 36,3** |
-| **0,2** | 0% · 3,0 | +67% · 11,5 | +400% · 8,0 | +567% · 0,5 | | | | |
-| **0,5** | | −33% · 3,3 | +100% · 0,4 | | | | | |
-| **0,65** | | | | | | +208% · 0,1 | | |
-| **1,0** | −80% · 0,8 | −67% · 0,8 | 0% · 11,2 | **+33% · 19,4** | +60% · 0,9 | +100% · 0,6 | +140% · 0,3 | |
-| **1,3** | −85% · 0,9 | −74% · 0,03 | −23% · 4,5 | **+3% · 20,4** | **+23% · 20,9** | **+54% · 26,0** | +85% · 6,5 | |
-| **1,6** | −88% · 0,01 | | | −17% · 0,1 | **0% · 5,9** | +25% · 3,7 | +50% · 0,5 | |
-| **1,9** | | | | | **−16% · 4,3** | +5% · 3,7 | +26% · 1,2 | |
-| **2,4** | | | | | −33% · 0,6 | −17% · 0,8 | 0% · 2,0 | |
+| IA \ CA | 0,3 | 0,5 | 1,15 | 1,5 | 2,0 | 2,4 | 3,0 | 3,6 | Zona Rural |
+|---|---|---|---|---|---|---|---|---|---|
+| **0,05** | +300% · 0,6 | | | | | | | | |
+| **0,1** | +100% · 105,1 | +233% · 5,7 | | +900% · 9,0 | +1.233% · 0,6 | | +1.900% · 0,1 | | **0% · 36,3** |
+| **0,2** | 0% · 3,0 | +67% · 11,5 | | +400% · 8,0 | +567% · 0,5 | | | | |
+| **0,25** | −20% · 0,5 | +33% · 0,8 | | | +433% · 0,4 | | | | |
+| **0,5** | | −33% · 3,3 | +53% · 0,1 | +100% · 0,4 | | | | | |
+| **0,65** | | | | | | | +208% · 0,1 | | |
+| **0,8** | | | | | | | +150% · 1,2 | | |
+| **1,0** | −80% · 0,8 | −67% · 1,0 | | 0% · 11,9 | **+33% · 20,1** | +60% · 0,9 | +100% · 0,9 | +140% · 0,3 | |
+| **1,3** | −85% · 0,9 | −74% · 0,1 | | −23% · 7,5 | **+3% · 23,3** | **+23% · 21,7** | **+54% · 26,6** | +85% · 6,5 | |
+| **1,6** | −88% · 0,01 | | | | −17% · 0,3 | **0% · 5,9** | +25% · 3,8 | +50% · 0,5 | |
+| **1,9** | | | | | | **−16% · 4,3** | +5% · 3,7 | +26% · 1,2 | |
+| **2,4** | | | | | | −33% · 0,6 | −17% · 0,9 | 0% · 2,0 | |
+| **3,0** | | | | | | −47% · 0,05 | | | |
 
 Combinações com menos de 0,01 km² foram omitidas. A matriz completa está no mapa e em `dados/tabelas/matriz_ia_ca_basico.csv`.
 
-### Onde o IA antigo não é numérico (96 km², sendo 36,6 km² na malha urbana)
+### IA das leis específicas (subunidades com código 23, 25, 39, 41 ou 999)
 
-O DMWeb 2.0 mostra o mesmo: para esses códigos o IA da DMI vem do Anexo 6 como texto, e a observação da subunidade aponta a norma que define o regime. O mapa traz essa norma em cada área (campo `regime_ref`).
+Nessas 414 subunidades (99 km²) o Anexo 6 não traz número. Cada uma foi conferida na norma que define o regime, lida no texto integral (SAPL da Câmara/PGM e DOPA, com OCR quando o arquivo era imagem). Também foram buscados decretos posteriores pela ementa no SAPL. Resultado:
 
-| Situação (malha urbana) | Área |
-|---|---|
-| Área especial de interesse institucional (código 23, IA "a critério", teto 2,5) | 9,6 km² |
-| AEIS, interesse social (código 25, regime próprio, teto 2,5) | 8,7 km² |
-| Interesse cultural e parques | 8,6 km² |
-| Cerca de 60 leis e decretos próprios (LC 624/09, 324/94, 935/22, 919/21, 960/22 etc.) | ~9 km² |
+| Situação | Subunidades | Área |
+|---|---|---|
+| **IA numérico encontrado na lei ou decreto** (entra na comparação) | 156 | 16,4 km² |
+| Ilhas do Delta do Jacuí: parque e APA estaduais (Lei Estadual 12.371/05), sem IA municipal | 20 | 39,3 km² |
+| Parques e áreas de proteção ambiental (códigos 25 e 39, regime próprio) | 45 | 20,0 km² |
+| Áreas especiais institucionais (código 23: regime a critério do município, IA até 2,5) | 28 | 9,0 km² |
+| AEIS sem regime definitivo (Dec 12.716/00 e 13.550/01: o regime sai no projeto de regularização) | 98 | 6,1 km² |
+| Áreas de interesse cultural (inclusive Centro Histórico e 4º Distrito: LC 930/21 e LC 960/22 mantêm o código 25) | 45 | 5,1 km² |
+| Leis que remetem o regime a decreto ou EVU sem fixar número (LC 717/13, LC 799/16 arts. 10/11 e 29–31, LC 736/14 etc.) | 22 | 3,2 km² |
 
-Nos códigos 23 e 25 a consulta mostra o **pior caso**, com o IA no teto de 2,5.
+Normas com mais área em que o IA foi encontrado:
+
+| Norma | Subunidades | IA básico |
+|---|---|---|
+| LC 935/22 (Fazenda Arado Velho) | 11 | 1,3 nas áreas urbanizáveis; 0,05 a 0,25 nas de proteção |
+| LC 624/09 (AEIS II de loteamentos irregulares) | 22 | 1,3 |
+| LC 799/16 (AEIS e regularizações) | 30 | 1,0 a 1,9, por subunidade |
+| LC 324/94 | 4 | 0,8 (máximo 2,5) |
+| LC 847/19 e LC 919/21 (AEIS III) | 2 | 1,3 |
+| LC 609/09 | 6 | 1,0 a 1,6 |
+| LC 833/18 e LC 764/15 (Hospitais Conceição e Mãe de Deus) | 2 | 3,0 |
+| LC 930/21 (armazéns do Cais Mauá) | 2 | 0,5 |
+| Cerca de 50 decretos de AEIS (2003–2026) | 1 a 5 cada | 1,0 a 1,9 (quase sempre 1,3) |
+
+Pontos que merecem atenção:
+
+- **Decretos que o DMWeb ainda não reflete.** Três subunidades seguem como "regime próprio" na base da Prefeitura, mas já têm IA em decreto, e o mapa usa esse IA:
+  - Dec 22.163/23: IA 1,3 em 10-002-16;
+  - Dec 23.877/26: IA 1,0 no Núcleo Esperança, 7-006-04 e 7-012-03;
+  - Dec 23.958/26: IA 1,3 em 7-012-05.
+- **LC 935/22 (Arado Velho)** foi declarada nula em 1ª instância (06/2024), com recurso pendente. O mapa usa o IA da lei e avisa na consulta.
+- **LC 930/21 (Centro Histórico).** Para quem adere ao programa, o IA básico do PDDUA é multiplicado por 1,5 e passa a contar a área total. Isso dá a mesma área privativa da conta usada aqui: IA × 1,5 × 0,8 = IA × 1,2.
+- **Conflito no Cais Mauá (1-002-04).** A LC 930/21 fixa IA 0,5; o Anexo VI.B da LC 960/22 lista a subunidade com código 25. O mapa usa 0,5 e registra o conflito.
+- **Normas que valem para parte da subunidade.**
+  - Dec 16.612/10 (Beco Vila da Paz) foi aplicado só ao polígono certo de 3-114-06.
+  - A LC 729/14 fixa IA 0,1 para um único imóvel na Ilha Grande dos Marinheiros. Por isso não foi estendida à subunidade 9-012-02.
+- **LC 405/97 (PUCRS)** limita a área construída total a 1,5 vez o terreno, contando as áreas não computáveis. Isso equivale a IA 1,0 na base do PDDUA.
+
+Onde a norma não fixa número, a consulta mostra a norma verificada. Nos códigos 23 e 25 mostra também o **pior caso**, com o IA no teto de 2,5. A lista completa, com artigo e observação de cada subunidade, está em `dados/tabelas/ia_leis_especificas.csv`.
 
 ### O que os números dizem
 
-- **Cidade consolidada (IA ≥ 1,0, 136 km²).** Com as emendas, a área privativa potencial básica cresce **+21% no agregado** (antes das emendas eram +13%):
-  - 12,8 km² perdem mais de 5%;
-  - 39,4 km² ficam praticamente iguais;
-  - 83,7 km² ganham mais de 5%.
+- **Cidade consolidada (IA ≥ 1,0, 146 km² com as áreas de lei específica).** Com as emendas, a área privativa potencial básica cresce **+20% no agregado** (antes das emendas eram +13%):
+  - 16,4 km² perdem mais de 5%;
+  - 43,1 km² ficam praticamente iguais;
+  - 86,3 km² ganham mais de 5%.
+
+  As áreas com IA de lei específica, quase todas AEIS com IA 1,3, ganham +15% no agregado.
 - **A Emenda 91 muda bastante a leitura.** Os 26 km² de IA 1,3 que viraram CA 3,0 passam de +23% para +54%. As áreas de IA 1,9 nas ZOT 12/13 e 08.3 deixam de perder (−16%) e passam a ganhar 5%.
 - **Maiores perdas que restam, com o potencial básico:**
 
@@ -204,9 +252,9 @@ Nos códigos 23 e 25 a consulta mostra o **pior caso**, com o IA no teto de 2,5.
   |---|---|
   | Azenha | −13% |
   | Passo D'Areia | −8% |
-  | Menino Deus | −6% |
+  | Cristo Redentor | −7% |
+  | Menino Deus | −7% |
   | Vila Ipiranga | −6% |
-  | Cristo Redentor | −5% |
 
   São as quadras de IA 1,9 que ficaram em CA 2,4 (ZOT 05 a 08, 10 e 11) e as de IA 1,3 que foram para CA 1,5 (ZOT 01).
 - **Maiores ganhos na malha urbana:**
@@ -217,10 +265,10 @@ Nos códigos 23 e 25 a consulta mostra o **pior caso**, com o IA no teto de 2,5.
   | Navegantes | +85% |
   | Humaitá | +85% |
   | São Geraldo | +71% |
+  | Costa e Silva | +67% |
   | Anchieta | +54% |
-  | Costa e Silva | +54% |
   | Parque Santa Fé | +54% |
-  | Sarandi | +50% |
+  | Sarandi | +53% |
 
   Fora o 4º Distrito, esses bairros são as ZOT 12/13 que passaram a CA 3,0.
 - **Atenção às áreas rarefeitas (IA 0,1 / 0,2).** O percentual é alto porque a base é pequena: IA 0,1 → CA 0,3 dá +100%, mas é 0,12 → 0,24 m² privativo por m² de terreno.
@@ -238,7 +286,11 @@ A tabela por bairro está em `dados/tabelas/dinamica_por_bairro.csv`, coluna `ga
 4. **Regime vindo da base GIS.** O regime por ZOT vem da base GIS da SMAMUS, não do texto da lei. Confira na LUOS publicada no DOPA antes de usar em viabilidade.
 5. **Só o zoneamento-base.** O mapa não traz gravames, recuos viários, AEIS, patrimônio cultural, APP, restrições do aeroporto (PBZPA), EVU nem outras condicionantes do lote. Para isso use o DMWeb (plano antigo) e a futura certidão do plano novo.
 6. **Potencial máximo não é garantido.** No PDDUA o IA máximo depende de estoque de solo criado. No plano novo, o CA máximo depende de outorga onerosa / TDC.
-7. **Precisão da geometria.** O HTML usa geometria simplificada a 0,3 m. Os GPKG/GeoJSON mantêm a geometria original. Lotes na divisa entre zonas devem ser conferidos no DMWeb.
+7. **IA de leis específicas.**
+   - A tabela foi montada lendo cada norma. Subunidades renumeradas depois da norma foram casadas pela observação do DMWeb e pela localização.
+   - Só o IA foi trazido das normas: altura e taxa de ocupação dessas áreas seguem o código do Anexo 7.1.
+   - Confira a norma citada antes de usar o número em viabilidade.
+8. **Precisão da geometria.** O HTML usa geometria simplificada a 0,3 m. Os GPKG/GeoJSON mantêm a geometria original. Lotes na divisa entre zonas devem ser conferidos no DMWeb.
 
 ## 7. Atualizar os dados
 

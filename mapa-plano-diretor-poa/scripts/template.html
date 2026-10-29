@@ -289,7 +289,7 @@ details.more p { margin: 6px 0 0; }
       <ul>
         <li>As leis novas entram em vigor 180 dias após a publicação (14/07/2026). Até lá vale o PDDUA.</li>
         <li>A base GIS da Prefeitura ainda não traz as emendas de CA básico. O mapa aplica: Emenda 91 (CA básico 3,0 nas ZOT 08.3-A, 08.3-B, 08.3-C, 12 e 13) e Subemenda 1 à Emenda 93 (CA básico 3,6 na ZOT 08.3-D, Bom Fim e Cidade Baixa). CA máximo e altura da ZOT 08.3-D seguem sem publicação.</li>
-        <li>Onde o IA antigo não é numérico, o regime vem de lei ou decreto próprio, AEIS ou área especial. O mapa mostra a norma (observações do DMWeb 2.0). Nos códigos 23 e 25 o Anexo 6 fixa teto de IA 2,5.</li>
+        <li>Onde o código do IA antigo não é numérico (23, 25, 39, 41), o IA foi lido na lei ou decreto específico da área: 156 subunidades, com a norma e o artigo na consulta. Onde nenhuma norma fixa número (AEIS sem regime definitivo, áreas institucionais, culturais, parques), o mapa mostra a norma verificada. Nos códigos 23 e 25 o Anexo 6 fixa teto de IA 2,5.</li>
         <li>Numeração das ruas é interpolada nos trechos oficiais: confira o lote no DMWeb antes de decidir.</li>
         <li>Geometria simplificada a 0,3 m para o HTML. Os arquivos completos (GPKG/GeoJSON) estão na pasta <span class="code">dados/</span>.</li>
       </ul>
@@ -369,11 +369,14 @@ function find(layer, ll) {
 
 /* ---------- atributos ---------- */
 const fmt = (v, d = 2) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
+/* onde o codigo do IA nao e numerico, a[10..12] trazem o IA da lei/decreto especifico e a norma */
 const OLD = D.old.a.map((a) => {
   const ia = D.lk.ia[a[6]] || [], vol = D.lk.vol[a[7]] || [];
+  const lei = a.length > 10 ? D.old.leis[a[12]] : null, porLei = !!lei && a[10] != null;
   return { cod: a[0], mz: a[1], ueu: a[2], sub: a[3], dens: a[4], ativ: a[5], iaCod: a[6], volCod: a[7], obs: a[8],
-    zona: D.lk.zu[a[5]] || 'Regime urbanístico próprio', iaBas: ia[0], iaMax: ia[1], sc: ia[2], tpc: ia[3], quota: ia[4],
-    iaObs: ia[5], teto: ia[6], ref: a[9] >= 0 ? D.old.refs[a[9]] : '', alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4] };
+    zona: D.lk.zu[a[5]] || 'Regime urbanístico próprio', iaBas: porLei ? a[10] : ia[0], iaMax: porLei ? a[11] : ia[1],
+    sc: ia[2], tpc: ia[3], quota: ia[4], iaObs: ia[5], teto: porLei ? null : ia[6], lei, porLei,
+    ref: a[9] >= 0 ? D.old.refs[a[9]] : '', alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4] };
 });
 /* Zona Rural: a LUOS remete a lei propria (LC 775/15), que mantem o regime do PDDUA da subunidade */
 const NEW = D.new.a.map((a) => {
@@ -397,7 +400,10 @@ function dyn(o, n) {
   return { gB: gainOf(o.iaBas, n.caBas, n.rural), gM: gainOf(o.iaMax, n.caMax, n.rural), dA };
 }
 const short = (t, k = 70) => (t && t.length > k ? t.slice(0, k - 1) + '…' : t);
-const iaTxt = (o) => (o.iaBas != null ? fmt(o.iaBas) : (o.ref ? short(o.ref, 60) : 'norma específica') + (o.teto ? ` (teto ${fmt(o.teto)})` : ''));
+const leiCurta = (o) => o.lei[0].split(',')[0];
+const iaTxt = (o) => (o.iaBas != null ? fmt(o.iaBas) + (o.porLei ? ` (${leiCurta(o)})` : '')
+  : (o.lei ? short(o.lei[1] || o.lei[0], 60) : o.ref ? short(o.ref, 60) : 'norma específica') + (o.teto ? ` (teto ${fmt(o.teto)})` : ''));
+const iaFonte = (o) => (o.porLei ? 'lei ou decreto específico' : o.iaBas != null ? 'Anexo 6' : 'sem IA numérico');
 function matchFilter(o, n, f) { return f.ca === 'ZR' ? n.rural && o.iaBas === f.ia : !n.rural && o.iaBas === f.ia && n.caBas === f.ca; }
 
 /* ---------- cores ---------- */
@@ -644,7 +650,7 @@ function resultHTML(q) {
     let why = '';
     if (n.rural) why = `<p class="note">Zona Rural: a LUOS remete à lei da Zona Rural (LC 775/15), que mantém o regime do PDDUA da subunidade. Mesmo índice e mesma base de cálculo, ganho zero.</p>`;
     else if (d.gB != null) why = `<p class="calc">(CA ${fmt(n.caBas)} × ${fmt(EF.new)}) ÷ (IA ${fmt(o.iaBas)} × ${fmt(EF.old)}) − 1 = ${fmt(pn)} ÷ ${fmt(po)} − 1</p>`;
-    else if (o.iaBas == null) why = `<p class="note">O IA antigo deste ponto é definido por: <b>${esc(o.ref || o.iaObs || 'norma específica')}</b>.${gT != null ? ` No pior caso, com o IA no teto do Anexo 6 (${fmt(o.teto)}), o ganho seria de <b>${pct(gT)}</b>; com IA menor, o ganho é maior.` : ''}</p>`;
+    else if (o.iaBas == null) why = `<p class="note">${o.lei ? `A norma deste ponto não fixa IA numérico: <b>${esc(o.lei[0])}</b>${o.lei[1] ? ' · ' + esc(o.lei[1]) : ''}.` : `O IA antigo deste ponto é definido por: <b>${esc(o.ref || o.iaObs || 'norma específica')}</b>.`}${gT != null ? ` No pior caso, com o IA no teto do Anexo 6 (${fmt(o.teto)}), o ganho seria de <b>${pct(gT)}</b>; com IA menor, o ganho é maior.` : ''}</p>`;
     else why = `<p class="note">O CA do plano novo não é numérico neste ponto (${esc(n.caTxt || n.zot)}).</p>`;
     h += `<div class="card dyn"><h3>Ganho de área privativa neste ponto</h3>
       <div class="gain">${gainChip(d.gB)}<span>com o potencial <b>básico</b>:<br>IA ${esc(iaTxt(o))} (antigo) → CA ${esc(n.caTxt)} (novo)</span></div>
@@ -661,7 +667,7 @@ function resultHTML(q) {
     h += `<div class="card old"><h3>Plano antigo · PDDUA</h3><div class="zone">${esc(o.zona)}</div>
       <div class="code">MZ ${o.mz} · UEU ${o.ueu} · Subunidade ${o.sub} &nbsp;|&nbsp; D·A·I·V ${esc(daiv)}</div>
       <dl class="kv" style="margin-top:8px">
-        <dt>IA básico (Anexo 6)</dt><dd>${o.iaBas != null ? fmt(o.iaBas) : '<span class="txt">norma específica</span>'}</dd>
+        <dt>IA básico (${o.porLei ? 'lei específica' : 'Anexo 6'})</dt><dd>${o.iaBas != null ? fmt(o.iaBas) : '<span class="txt">sem IA numérico</span>'}</dd>
         ${o.teto ? `<dt>Teto do IA (Anexo 6)</dt><dd>${fmt(o.teto)}</dd>` : ''}
         <dt>IA máximo (solo criado + TPC)</dt><dd>${fmt(o.iaMax)}</dd>
         <dt>Área privativa potencial (IA × ${fmt(EF.old)}), básica / máxima</dt><dd>${fmt(privOld(o.iaBas))} / ${fmt(privOld(o.iaMax))}</dd>
@@ -670,7 +676,8 @@ function resultHTML(q) {
         <dt>Altura na divisa · base</dt><dd class="txt">${esc(o.altDiv || '—')} · ${esc(o.altBase || '—')}</dd>
         <dt>Taxa de ocupação</dt><dd class="txt">${esc(o.to || '—')}</dd>
       </dl>
-      ${o.ref ? `<p class="note">Regime definido por: <b>${esc(o.ref)}</b> (observação do DMWeb).</p>` : ''}
+      ${o.lei ? `<p class="note">${o.porLei ? 'IA fixado por' : 'Norma verificada'}: <b>${esc(o.lei[0])}</b>${o.lei[1] ? ' · ' + esc(o.lei[1]) : ''}.</p>` : ''}
+      ${o.ref && !o.lei ? `<p class="note">Regime definido por: <b>${esc(o.ref)}</b> (observação do DMWeb).</p>` : ''}
       ${o.iaObs ? `<p class="note">${esc(o.iaObs)}</p>` : ''}
       ${o.obs ? `<p class="note">Observações da subunidade (códigos): ${esc(o.obs)}</p>` : ''}
       ${q.viaO != null ? `<p class="note">O ponto cai na via; mostrando a subunidade mais próxima (a ${Math.round(q.viaO)} m). Confira o lado da rua.</p>` : ''}</div>`;
@@ -700,7 +707,7 @@ function summaryText(q) {
   const o = q.io >= 0 ? OLD[q.io] : null, n = q.inw >= 0 ? NEW[q.inw] : null;
   const L1 = [`Ponto: ${q.ll.lat.toFixed(6)}, ${q.ll.lng.toFixed(6)}${q.label ? ' (' + q.label + ')' : ''}`];
   if (o && n) { const d = dyn(o, n); L1.push(`Ganho de área privativa (básico): ${pct(d.gB, 1)} | IA ${iaTxt(o)} × ${fmt(EF.old)} → CA ${n.caTxt}${n.rural ? '' : ' × ' + fmt(EF.new)} | com potencial máximo: ${pct(d.gM, 1)}`); }
-  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${iaTxt(o)} (máx ${fmt(o.iaMax)}) | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}${o.ref ? ' | regime: ' + o.ref : ''}`);
+  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${iaTxt(o)} (máx ${fmt(o.iaMax)}) | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}${o.lei ? ' | norma: ' + o.lei[0] : o.ref ? ' | regime: ' + o.ref : ''}`);
   if (n) L1.push(`LUOS 2026: ${n.zot} | CA ${n.caTxt} (máx ${n.r.ca_max_txt || '—'}) | altura ${n.r.alt_txt || '—'} m | lote mín. ${n.r.lote_min || '—'} m²${n.r.fonte_ca_bas && /menda/.test(n.r.fonte_ca_bas) ? ' | CA básico: ' + n.r.fonte_ca_bas : ''}`);
   return L1.join('\n');
 }
@@ -981,9 +988,9 @@ new MutationObserver(themeChanged).observe(document.documentElement, { attribute
 if (STANDALONE) {
   $('#export').hidden = false;
   const props = {
-    old: (i) => { const o = OLD[i]; return { cod_subun: o.cod, mz: o.mz, ueu: o.ueu, subunidade: o.sub, densidade: o.dens, atividade: o.ativ, indice: o.iaCod, volumetria: o.volCod, zona_uso: o.zona, ia_basico: o.iaBas, ia_maximo: o.iaMax, priv_basica: privOld(o.iaBas), altura_max: o.alt, altura_txt: o.altTxt }; },
+    old: (i) => { const o = OLD[i]; return { cod_subun: o.cod, mz: o.mz, ueu: o.ueu, subunidade: o.sub, densidade: o.dens, atividade: o.ativ, indice: o.iaCod, volumetria: o.volCod, zona_uso: o.zona, ia_basico: o.iaBas, ia_maximo: o.iaMax, ia_fonte: iaFonte(o), ia_lei: o.lei ? o.lei[0] : null, priv_basica: privOld(o.iaBas), altura_max: o.alt, altura_txt: o.altTxt }; },
     new: (i) => { const n = NEW[i]; return { zot: n.zot, bairro: n.bairro, setor: n.setor, upl: n.upl, zot_projeto: n.zotProj, ca_basico: n.caBas, ca_maximo: n.caMax, priv_basica: privNew(n.caBas, n.rural), fonte_ca_basico: n.rural ? 'LC 775/15 (regime do PDDUA)' : n.r.fonte_ca_bas, altura_max: n.alt, ca_basico_txt: n.r.ca_bas_txt, ca_maximo_txt: n.r.ca_max_txt, altura_txt: n.r.alt_txt }; },
-    ov: (i) => { const [a, b, ar] = D.ov.a[i], o = OLD[a], n = NEW[b], d = dyn(o, n); return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ia_basico_ant: o.iaBas, ca_basico_novo: n.caBas, ef_ant: EF.old, ef_novo: EF.new, priv_ant: privOld(o.iaBas), priv_novo: privNew(n.caBas, n.rural), regime_ref_ant: o.ref, ia_teto_ant: o.teto, ganho_bas_pct: d.gB == null ? null : Math.round(d.gB * 1000) / 10, ganho_max_pct: d.gM == null ? null : Math.round(d.gM * 1000) / 10, alt_ant: o.alt, alt_novo: n.alt, area_m2: ar }; },
+    ov: (i) => { const [a, b, ar] = D.ov.a[i], o = OLD[a], n = NEW[b], d = dyn(o, n); return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ia_basico_ant: o.iaBas, ca_basico_novo: n.caBas, ef_ant: EF.old, ef_novo: EF.new, priv_ant: privOld(o.iaBas), priv_novo: privNew(n.caBas, n.rural), regime_ref_ant: o.ref, ia_fonte_ant: iaFonte(o), ia_lei_ant: o.lei ? o.lei[0] : null, ia_teto_ant: o.teto, ganho_bas_pct: d.gB == null ? null : Math.round(d.gB * 1000) / 10, ganho_max_pct: d.gM == null ? null : Math.round(d.gM * 1000) / 10, alt_ant: o.alt, alt_novo: n.alt, area_m2: ar }; },
   };
   document.querySelectorAll('[data-exp]').forEach((b) => b.addEventListener('click', () => {
     const k = b.dataset.exp, lay = LAYERS[k];

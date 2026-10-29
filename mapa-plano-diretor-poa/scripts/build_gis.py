@@ -135,7 +135,12 @@ OBS2 = OBS2.set_index('CODIGO').DESCRICAO.astype(str).str.strip().str.rstrip('.'
 def regime_ref(codes):
     ds = [OBS2.get(int(c), '') for c in codes.split(',') if c]
     ds = [d for d in ds if d and d != 'nan']
+    # nota padrao das AEIS (Resolucao 40/00) cita "regime urbanistico" mas nao define o regime
+    gen = [d for d in ds if d.upper().startswith('OS IMOVEIS GRAVADOS INDEVIDAMENTE')]
+    ds = [d for d in ds if d not in gen] + gen
     for d in ds:
+        if d in gen:
+            continue
         if re.search(r'(?i)regime urban|L\.?C\.? ?960|setor de ', d):
             return d
     for d in ds:
@@ -146,9 +151,37 @@ def regime_ref(codes):
 
 o['obs_texto'] = o.obs.map(lambda c: ' | '.join(d for d in (OBS2.get(int(x), '') for x in c.split(',') if x) if d and d != 'nan'))
 o['regime_ref'] = o.obs.map(regime_ref)
+
+# IA das leis e decretos especificos onde o Anexo 6 nao da numero (codigos 23/25/39/41/999).
+# Tabela curada a mao lendo cada norma (scripts/ia_leis_especificas.csv); chave "MZ-UEU-SUB",
+# ou "MZ-UEU-SUB@id_ant" quando a norma vale so para um dos poligonos da subunidade.
+LEIS = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ia_leis_especificas.csv'),
+                   sep=';', dtype=str).fillna('')
+o['sub_txt'] = (o.mz.astype(int).astype(str) + '-' + o.ueu.astype(int).map('{:03d}'.format) + '-'
+                + o.subunid.astype(int).map('{:02d}'.format))
+lei = LEIS.set_index('cod')
+key = (o.sub_txt + '@' + o.id_ant.astype(str)).where(lambda k: k.isin(lei.index), o.sub_txt)
+alvo = o.ia_bas.isna() & key.isin(lei.index)
+li = lei.reindex(key[alvo])
+o['ia_fonte'] = np.where(o.ia_bas.notna(), 'Anexo 6 (código do IA)', None)
+o['ia_lei'] = None
+o['ia_lei_obs'] = None
+o.loc[alvo, 'ia_lei'] = (li.norma + np.where(li.dispositivo.isin(['', '-']), '', ', ' + li.dispositivo)).values
+o.loc[alvo, 'ia_lei_obs'] = li.nota.values
+v_bas, v_max = li.ia_bas.map(num).values, li.ia_max.map(num).values
+o.loc[alvo, 'ia_bas'] = v_bas
+o.loc[alvo, 'ia_max'] = np.where(np.isnan(v_max.astype(float)), v_bas, v_max)   # sem maximo na norma: sem solo criado
+o.loc[alvo & o.ia_bas.notna(), 'ia_fonte'] = 'Lei ou decreto específico'
+o.loc[alvo & o.ia_bas.isna(), 'ia_fonte'] = 'Sem IA numérico (norma verificada)'
+o.loc[alvo & o.ia_bas.notna(), 'ia_teto'] = np.nan
+o['caeq_bas'] = (o.ia_bas * FATOR_NAO_ADENSAVEL).round(2)
+o['caeq_max'] = (o.ia_max * FATOR_NAO_ADENSAVEL).round(2)
+o = o.drop(columns='sub_txt')
 old_g = gpd.GeoDataFrame(o, geometry=old.geometry.values, crs=CRS_M)
-print('PDDUA:', len(old_g), 'subunidades; sem IA numerico:', old_g.ia_bas.isna().sum(),
-      '; sem altura numerica:', old_g.alt_max.isna().sum())
+print('PDDUA:', len(old_g), 'subunidades; IA por lei especifica:', (old_g.ia_fonte == 'Lei ou decreto específico').sum(),
+      '; sem IA numerico:', old_g.ia_bas.isna().sum(), '; sem altura numerica:', old_g.alt_max.isna().sum())
+LEIS.rename(columns={'cod': 'subunidade', 'ia_bas': 'ia_basico', 'ia_max': 'ia_maximo', 'nota': 'observacao'}).to_csv(
+    os.path.join(OUT, 'tabelas', 'ia_leis_especificas.csv'), index=False)
 save(old_g, 'pddua_antigo_zonas', 'pddua_antigo_zonas')
 ia.reset_index().drop(columns=['objectid', 'objectid_1'], errors='ignore').to_csv(
     os.path.join(OUT, 'tabelas', 'pddua_anexo6_indice_aproveitamento.csv'), index=False)
@@ -254,7 +287,7 @@ save(new, 'pdus_novo_zonas', 'pdus_novo_zonas')
 
 # ---------------------------------------------------------------- Sobreposicao
 OLDC = ['id_ant', 'cod_subun', 'zona_uso', 'dens_cod', 'ativ_cod', 'ia_cod', 'vol_cod', 'ia_bas', 'ia_max',
-        'ia_teto', 'regime_ref', 'caeq_bas', 'caeq_max', 'alt_max']
+        'ia_fonte', 'ia_lei', 'ia_teto', 'regime_ref', 'caeq_bas', 'caeq_max', 'alt_max']
 NEWC = ['id_novo', 'zot', 'ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'base_calc', 'bairro']
 a = old_g[OLDC + ['geometry']].rename(columns={'alt_max': 'alt_ant'})
 b = new[NEWC + ['geometry']].rename(columns={'alt_max': 'alt_novo'})

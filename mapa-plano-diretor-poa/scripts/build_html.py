@@ -75,11 +75,18 @@ payload = {}
 og = simp(old, 0.3)
 refs = sorted({r for r in old.regime_ref.fillna('') if r})
 ref_i = {r: i for i, r in enumerate(refs)}
+txt = lambda v: v if isinstance(v, str) else ''
+# IA tirado da lei/decreto especifico (scripts/ia_leis_especificas.csv): [10] IA basico, [11] IA maximo, [12] indice em 'leis'
+leis = sorted({(txt(r.ia_lei), txt(r.ia_lei_obs)) for r in old.itertuples() if txt(r.ia_lei)})
+lei_i = {k: i for i, k in enumerate(leis)}
 payload['old'] = {
     'g': [enc_poly(g) for g in og],
     'a': [[r.cod_subun, val(r.mz), val(r.ueu), val(r.subunid), r.dens_cod, r.ativ_cod, r.ia_cod, r.vol_cod, r.obs or '',
-           ref_i.get(r.regime_ref or '', -1)] for r in old.itertuples()],
+           ref_i.get(r.regime_ref or '', -1)] +
+          ([val(r.ia_bas), val(r.ia_max), lei_i[(txt(r.ia_lei), txt(r.ia_lei_obs))]] if txt(r.ia_lei) else [])
+          for r in old.itertuples()],
     'refs': refs,   # lei/decreto/area especial que define o regime (observacoes do DMWeb 2.0)
+    'leis': [list(k) for k in leis],   # [norma e dispositivo, observacao]
 }
 lk_ia, lk_vol, lk_zu = {}, {}, {}
 for r in old.drop_duplicates('ia_cod').itertuples():
