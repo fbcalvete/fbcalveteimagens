@@ -100,7 +100,9 @@ Os GPKG e GeoJSON estão em WGS 84 (EPSG:4326). Abrem no QGIS, ArcGIS, Global Ma
 | Campo | Significado |
 |---|---|
 | `priv_ant`, `priv_novo` | Área privativa potencial por m² de terreno: IA × 1,2 e CA × 0,8. |
-| `ganho_bas` | Ganho de área privativa com o potencial básico, em %: (CA × 0,8) ÷ (IA × 1,2) − 1. |
+| `ganho_bas` | Ganho de área privativa com o potencial básico, em %: (CA × 0,8) ÷ (IA × 1,2) − 1. Na Zona Rural é 0. |
+| `base_calc` | `LUOS (CA)` ou `PDDUA (IA)` (Zona Rural). |
+| `regime_ref`, `ia_teto` | Norma que define o regime quando o IA não é numérico, e o teto do Anexo 6. |
 | `ganho_max` | O mesmo cálculo com IA máximo e CA máximo. |
 | `d_ca_bas`, `d_ca_max` | CA novo − CA equivalente antigo. |
 | `d_alt` | Altura nova − altura antiga (m). |
@@ -130,6 +132,13 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 - **Classes.** Diferenças de até ±0,05 no CA ou ±0,5 m na altura contam como **Manteve**.
 - **CA máximo sem acréscimo.** Quando o CA máximo novo é "Não se aplica" ou "Ajuste/TDC", ele é tratado como igual ao básico.
 - **Regime por ZOT.** Vem do Anexo 5, apenas dos quarteirões em que a zona antes e depois das emendas é a mesma. Nas linhas alteradas por emenda, a base oficial ainda traz o regime da zona anterior.
+- **Emendas de CA básico aplicadas.** A base GIS ainda não as incorporou; ambas foram aprovadas em 13/05/2026:
+  - **Emenda 91:** CA básico 3,0 nas ZOT 08.3-A, 08.3-B, 08.3-C, 12 e 13, mantidos os demais parâmetros;
+  - **Subemenda 1 à Emenda 93:** CA básico 3,6 no Bom Fim e na Cidade Baixa (ZOT 08.3-D).
+
+  O valor original da base fica em `ca_bas_gis` e a origem em `fonte_ca_bas`. Para mudar, edite `EMENDAS_CA_BAS` em `scripts/build_gis.py`.
+- **Zona Rural.** A LUOS (LC 1.076/2026, art. 22) diz que a Zona Rural não é ZOT e segue lei própria. A LC 775/15 (art. 5º, §1º) mantém nela o regime do PDDUA da subunidade (Área de Produção Primária, IA 0,1). Por isso o "CA" rural é o próprio IA do PDDUA, com a mesma base de cálculo e eficiência 1,2 nos dois lados: ganho 0%.
+- **IA não numérico.** O regime vem de norma própria. A norma de cada área vem das observações da subunidade, nas tabelas do DMWeb 2.0 publicadas no portal da SMAMUS (`dm_obs_tipo2`), e fica no campo `regime_ref`. Nos códigos 23 e 25 o Anexo 6 fixa teto de IA 2,5 (`ia_teto`).
 - **Áreas fora do mapa da LUOS.** Onde o mapa sancionado não cobre (áreas ESPECIAIS, alguns quarteirões), a zona vem do Anexo 5. O campo `fonte` indica esses polígonos.
 - **Sobreposição.** Interseção geométrica em SIRGAS 2000 / UTM 22S (EPSG:31982). Peças menores que 10 m² foram descartadas.
 
@@ -137,58 +146,95 @@ O link do ArcGIS Experience indicado no pedido ("Pós Audiência – Zoneamento 
 
 ### Combinações de IA × CA básico que existem na cidade
 
-**IA do plano antigo (Anexo 6):** 0,1 · 0,2 · 0,5 · 0,65 · 1,0 · 1,3 · 1,6 · 1,9 · 2,4. Os códigos 23, 25, 39, 41 e 999 não têm valor numérico (regime próprio, EVU ou lei específica).
+**IA do plano antigo (Anexo 6):** 0,1 · 0,2 · 0,5 · 0,65 · 1,0 · 1,3 · 1,6 · 1,9 · 2,4.
 
-**CA básico do plano novo:** 0,3 · 0,5 · 1,15 · 1,5 · 2,0 · 2,4 · 3,6. Especial, Zona Rural, polígono vetado e ZOT 08.3-D não têm valor numérico.
+**CA básico do plano novo:**
 
-**CA 3,0 não existe como CA básico.** É o CA **máximo** das ZOT 02 e 03.
+| CA | Onde |
+|---|---|
+| 0,3 | ZOT 15 e 16 |
+| 0,5 | ZOT 14 |
+| 1,15 | ZOT 08.1-F |
+| 1,5 | ZOT 01 |
+| 2,0 | ZOT 02, 03, 04 e 09 |
+| 2,4 | ZOT 05, 06, 07, 08, 10 e 11 |
+| **3,0** | ZOT 08.3-A/B/C, 12 e 13, pela Emenda 91 |
+| 3,6 | ZOT 08.1, 08.2 e **08.3-D**, esta pela Subemenda 1 à Emenda 93 |
+| Zona Rural | Mantém o IA do PDDUA (LC 775/15) |
 
-Ganho de área privativa e área de quarteirões em cada combinação (km²):
+Ganho de área privativa com o potencial básico e área de quarteirões em cada combinação, em km²:
 
-| IA \ CA | 0,3 | 0,5 | 1,5 | 2,0 | 2,4 | 3,6 |
-|---|---|---|---|---|---|---|
-| **0,1** | +100% · 103,5 | +233% · 5,7 | +900% · 9,0 | +1.233% · 0,6 | +1.500% · 0,05 | |
-| **0,2** | 0% · 3,0 | +67% · 11,5 | +400% · 8,0 | +567% · 0,5 | | |
-| **0,5** | −60% · <0,01 | −33% · 3,3 | +100% · 0,4 | +167% · <0,01 | | |
-| **0,65** | | | | | +146% · 0,1 | |
-| **1,0** | −80% · 0,8 | −67% · 0,8 | 0% · 11,2 | **+33% · 19,4** | +60% · 1,4 | +140% · 0,3 |
-| **1,3** | −85% · 0,9 | −74% · 0,03 | −23% · 4,5 | **+3% · 20,4** | **+23% · 46,8** | +85% · 6,4 |
-| **1,6** | −88% · 0,01 | | −38% · <0,01 | −17% · 0,1 | **0% · 9,6** | +50% · 0,5 |
-| **1,9** | | | | | **−16% · 8,0** | +26% · 1,2 |
-| **2,4** | | | | | −33% · 1,4 | 0% · 1,2 |
+| IA \ CA | 0,3 | 0,5 | 1,5 | 2,0 | 2,4 | 3,0 | 3,6 | Zona Rural |
+|---|---|---|---|---|---|---|---|---|
+| **0,1** | +100% · 103,5 | +233% · 5,7 | +900% · 9,0 | +1.233% · 0,6 | | +1.900% · 0,05 | | **0% · 36,3** |
+| **0,2** | 0% · 3,0 | +67% · 11,5 | +400% · 8,0 | +567% · 0,5 | | | | |
+| **0,5** | | −33% · 3,3 | +100% · 0,4 | | | | | |
+| **0,65** | | | | | | +208% · 0,1 | | |
+| **1,0** | −80% · 0,8 | −67% · 0,8 | 0% · 11,2 | **+33% · 19,4** | +60% · 0,9 | +100% · 0,6 | +140% · 0,3 | |
+| **1,3** | −85% · 0,9 | −74% · 0,03 | −23% · 4,5 | **+3% · 20,4** | **+23% · 20,9** | **+54% · 26,0** | +85% · 6,5 | |
+| **1,6** | −88% · 0,01 | | | −17% · 0,1 | **0% · 5,9** | +25% · 3,7 | +50% · 0,5 | |
+| **1,9** | | | | | **−16% · 4,3** | +5% · 3,7 | +26% · 1,2 | |
+| **2,4** | | | | | −33% · 0,6 | −17% · 0,8 | 0% · 2,0 | |
 
-A coluna CA 1,15 (ZOT 08.1-F) só ocorre sobre IA não numérico, por isso não aparece na tabela.
+Combinações com menos de 0,01 km² foram omitidas. A matriz completa está no mapa e em `dados/tabelas/matriz_ia_ca_basico.csv`.
+
+### Onde o IA antigo não é numérico (96 km², sendo 36,6 km² na malha urbana)
+
+O DMWeb 2.0 mostra o mesmo: para esses códigos o IA da DMI vem do Anexo 6 como texto, e a observação da subunidade aponta a norma que define o regime. O mapa traz essa norma em cada área (campo `regime_ref`).
+
+| Situação (malha urbana) | Área |
+|---|---|
+| Área especial de interesse institucional (código 23, IA "a critério", teto 2,5) | 9,6 km² |
+| AEIS, interesse social (código 25, regime próprio, teto 2,5) | 8,7 km² |
+| Interesse cultural e parques | 8,6 km² |
+| Cerca de 60 leis e decretos próprios (LC 624/09, 324/94, 935/22, 919/21, 960/22 etc.) | ~9 km² |
+
+Nos códigos 23 e 25 a consulta mostra o **pior caso**, com o IA no teto de 2,5.
 
 ### O que os números dizem
 
-- **Cidade consolidada (IA ≥ 1,0, 135 km²).** A área privativa potencial básica cresce **13% no agregado**:
-  - 16 km² perdem mais de 5%;
-  - 42 km² ficam praticamente iguais (±5%);
-  - 76 km² ganham mais de 5%.
-- **Maiores perdas, com o potencial básico:**
+- **Cidade consolidada (IA ≥ 1,0, 136 km²).** Com as emendas, a área privativa potencial básica cresce **+21% no agregado** (antes das emendas eram +13%):
+  - 12,8 km² perdem mais de 5%;
+  - 39,4 km² ficam praticamente iguais;
+  - 83,7 km² ganham mais de 5%.
+- **A Emenda 91 muda bastante a leitura.** Os 26 km² de IA 1,3 que viraram CA 3,0 passam de +23% para +54%. As áreas de IA 1,9 nas ZOT 12/13 e 08.3 deixam de perder (−16%) e passam a ganhar 5%.
+- **Maiores perdas que restam, com o potencial básico:**
 
   | Bairro | Ganho |
   |---|---|
-  | Azenha | −24% |
-  | Passo D'Areia | −15% |
-  | Cristo Redentor | −13% |
-  | Menino Deus | −12% |
-  | Vila Ipiranga | −10% |
-  | Santana | −9% |
-  | Rio Branco | −8% |
-  | Santa Cecília | −8% |
+  | Azenha | −13% |
+  | Passo D'Areia | −8% |
+  | Menino Deus | −6% |
+  | Vila Ipiranga | −6% |
+  | Cristo Redentor | −5% |
 
-  São basicamente as áreas de IA 1,9 que viraram CA 2,4 (−16%) e as de IA 1,3 que viraram CA 1,5 (−23%).
-- **Maiores ganhos na malha urbana:** 4º Distrito, com Farrapos (+91%), Navegantes (+85%) e Humaitá (+85%).
-- **Atenção às áreas rarefeitas (IA 0,1 / 0,2, 146 km²).** O percentual é alto porque a base é pequena: IA 0,1 → CA 0,3 dá +100%, mas é 0,12 → 0,24 m² privativo por m² de terreno. Bairros como Pitinga, Belém Velho e Ponta Grossa lideram em % por isso, não por virarem áreas adensáveis.
+  São as quadras de IA 1,9 que ficaram em CA 2,4 (ZOT 05 a 08, 10 e 11) e as de IA 1,3 que foram para CA 1,5 (ZOT 01).
+- **Maiores ganhos na malha urbana:**
 
-A tabela completa está em `dados/tabelas/dinamica_por_bairro.csv`, coluna `ganho_priv_bas_pct`, agregada por área.
+  | Bairro | Ganho |
+  |---|---|
+  | Farrapos | +91% |
+  | Navegantes | +85% |
+  | Humaitá | +85% |
+  | São Geraldo | +71% |
+  | Anchieta | +54% |
+  | Costa e Silva | +54% |
+  | Parque Santa Fé | +54% |
+  | Sarandi | +50% |
+
+  Fora o 4º Distrito, esses bairros são as ZOT 12/13 que passaram a CA 3,0.
+- **Atenção às áreas rarefeitas (IA 0,1 / 0,2).** O percentual é alto porque a base é pequena: IA 0,1 → CA 0,3 dá +100%, mas é 0,12 → 0,24 m² privativo por m² de terreno.
+
+A tabela por bairro está em `dados/tabelas/dinamica_por_bairro.csv`, coluna `ganho_priv_bas_pct`, agregada por área.
 
 ## 6. Limitações (leia antes de decidir)
 
 1. **Vigência.** As leis novas entram em vigor 180 dias após a publicação (14/07/2026), por volta de janeiro/2027. Até lá vale o PDDUA. Há ação judicial (MPF) questionando o processo de revisão.
 2. **Vetos.** Polígonos vetados (≈4,6 km² na Lomba do Pinheiro) aparecem como "POLÍGONO VETADO". O regime depende da apreciação do veto pela Câmara.
-3. **ZOT 08.3 - D.** Foi criada por emenda (Cidade Baixa e Bom Fim) e ainda não tem parâmetros na base GIS da Prefeitura. Fica como "sem comparação".
+3. **Emendas e ZOT 08.3-D.**
+   - O CA básico das ZOT 08.3-A/B/C, 12, 13 e 08.3-D vem das emendas aprovadas, conforme a lista publicada da votação, e não da base GIS. Confira no texto final da LC 1.076/2026, Anexo 2.
+   - A ZOT 08 propriamente dita (0,22 km² em Praia de Belas, Azenha e Menino Deus) não aparece na Emenda 91 e foi mantida em 2,4.
+   - CA máximo e altura da ZOT 08.3-D seguem sem publicação.
 4. **Regime vindo da base GIS.** O regime por ZOT vem da base GIS da SMAMUS, não do texto da lei. Confira na LUOS publicada no DOPA antes de usar em viabilidade.
 5. **Só o zoneamento-base.** O mapa não traz gravames, recuos viários, AEIS, patrimônio cultural, APP, restrições do aeroporto (PBZPA), EVU nem outras condicionantes do lote. Para isso use o DMWeb (plano antigo) e a futura certidão do plano novo.
 6. **Potencial máximo não é garantido.** No PDDUA o IA máximo depende de estoque de solo criado. No plano novo, o CA máximo depende de outorga onerosa / TDC.

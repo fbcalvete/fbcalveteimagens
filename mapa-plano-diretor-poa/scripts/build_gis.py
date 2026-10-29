@@ -123,6 +123,29 @@ o['caeq_max'] = (o.ia_max * FATOR_NAO_ADENSAVEL).round(2)
 obs = old[['OBS_1', 'OBS_2', 'OBS_3', 'OBS_4', 'OBS_5']].fillna(0).astype(int)
 o['obs'] = obs.apply(lambda r: ','.join(str(v) for v in r if v), axis=1)
 o['area_m2'] = old.area.round(1)
+# Teto do IA quando o Anexo 6 nao da numero (codigos 23 e 25: "nao podera ser maior que 2,5")
+teto = ia.obs_1.fillna('').str.extract(r'maior que (\d+,\d+)')[0].map(num)
+o['ia_teto'] = o.ia_cod.map(teto)
+# Observacoes da subunidade (tabela DMOBSERVACAO_TIPO2 do DMWeb 2.0): dizem qual lei/decreto define o
+# regime quando o IA nao e numerico (AEIS, area especial, LC especifica...)
+OBS2 = pd.read_excel(os.path.join(RAW, 'dm_obs_tipo2.xls'), engine='xlrd')
+OBS2 = OBS2.set_index('CODIGO').DESCRICAO.astype(str).str.strip().str.rstrip('.').to_dict()
+
+
+def regime_ref(codes):
+    ds = [OBS2.get(int(c), '') for c in codes.split(',') if c]
+    ds = [d for d in ds if d and d != 'nan']
+    for d in ds:
+        if re.search(r'(?i)regime urban|L\.?C\.? ?960|setor de ', d):
+            return d
+    for d in ds:
+        if re.search(r'(?i)interesse social|AEIS', d):
+            return 'AEIS - Área especial de interesse social'
+    return ds[0] if ds else ''
+
+
+o['obs_texto'] = o.obs.map(lambda c: ' | '.join(d for d in (OBS2.get(int(x), '') for x in c.split(',') if x) if d and d != 'nan'))
+o['regime_ref'] = o.obs.map(regime_ref)
 old_g = gpd.GeoDataFrame(o, geometry=old.geometry.values, crs=CRS_M)
 print('PDDUA:', len(old_g), 'subunidades; sem IA numerico:', old_g.ia_bas.isna().sum(),
       '; sem altura numerica:', old_g.alt_max.isna().sum())
@@ -164,7 +187,21 @@ reg['ca_max'] = reg.ca_max_txt.map(num)
 # CA maximo "Nao se aplica"/"Ajuste/TDC": sem acrescimo oneroso -> igual ao basico
 reg.loc[reg.ca_max.isna() & reg.ca_bas.notna(), 'ca_max'] = reg.ca_bas
 reg['alt_max'] = reg.alt_txt.map(num)
-reg = reg[['ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'ca_bas_txt', 'ca_max_txt', 'ca_3_txt', 'ca_4_txt',
+# Emendas aprovadas na Camara (13/05/2026) que a base GIS da Prefeitura ainda nao incorporou.
+# Os demais parametros ficam inalterados (CA maximo, altura...).
+EMENDAS_CA_BAS = {
+    'ZOT 08.3 - A': (3.0, 'Emenda 91'), 'ZOT 08.3 - B': (3.0, 'Emenda 91'), 'ZOT 08.3 - C': (3.0, 'Emenda 91'),
+    'ZOT 12': (3.0, 'Emenda 91'), 'ZOT 13': (3.0, 'Emenda 91'),
+    'ZOT 08.3 - D': (3.6, 'Subemenda 1 à Emenda 93 (Bom Fim e Cidade Baixa)'),
+}
+reg['ca_bas_gis'] = reg.ca_bas
+reg['fonte_ca_bas'] = np.where(reg.ca_bas.notna(), 'Anexo 5 (base GIS SMAMUS)', None)
+for z, (v, fonte) in EMENDAS_CA_BAS.items():
+    reg.loc[z, ['ca_bas', 'ca_bas_txt', 'fonte_ca_bas']] = [v, f'{v:.1f}'.replace('.', ','), fonte]
+# Zona Rural: LUOS art. 22 remete a lei propria; LC 775/15 art. 5o par. 1o mantem o regime do PDDUA
+# (Area de Producao Primaria) em cada subunidade. O valor numerico e atribuido por poligono, abaixo.
+reg.loc['ZONA RURAL', 'fonte_ca_bas'] = 'LC 775/15: mantém o regime do PDDUA (IA da subunidade)'
+reg = reg[['ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'ca_bas_txt', 'fonte_ca_bas', 'ca_bas_gis', 'ca_max_txt', 'ca_3_txt', 'ca_4_txt',
            'alt_txt', 'lote_min', 'testada', 'mod_frac', 'perm_min', 'perm_max', 'afast_fre', 'afast_lat',
            'afast_fun', 'recuo_jard', 'parcelam', 'edificac', 'ativid', 'caract', 'finalid']]
 reg.to_csv(os.path.join(OUT, 'tabelas', 'pdus_regime_por_zot.csv'))
@@ -195,6 +232,19 @@ jj = gpd.sjoin(cent, a5[['zona_posaud', 'geometry']], how='left', predicate='wit
 new['zot_projeto'] = jj.set_index('i').zona_posaud.reindex(new.index).values
 new = new.join(reg[['ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'ca_bas_txt', 'ca_max_txt', 'alt_txt',
                     'lote_min', 'mod_frac', 'perm_min', 'perm_max', 'recuo_jard']], on='zot')
+new = new.join(reg[['fonte_ca_bas']], on='zot')
+# Zona Rural: CA = IA do PDDUA da subunidade dominante (mesma base de calculo do plano antigo)
+rur = new.zot.eq('ZONA RURAL')
+new['base_calc'] = np.where(rur, 'PDDUA (IA)', 'LUOS (CA)')
+if rur.any():
+    x = gpd.overlay(new.loc[rur, ['geometry']].rename_axis('i').reset_index(), old_g[['ia_bas', 'ia_max', 'geometry']],
+                    how='intersection', keep_geom_type=True)
+    x['a'] = x.area
+    dom = x.sort_values('a').groupby('i').last()
+    new.loc[rur, 'ca_bas'] = dom.ia_bas.reindex(new.index[rur]).values
+    new.loc[rur, 'ca_max'] = dom.ia_max.reindex(new.index[rur]).values
+    new.loc[rur, 'ca_bas_txt'] = new.loc[rur, 'ca_bas'].map(
+        lambda v: (f'{v:g}'.replace('.', ',') + ' (IA do PDDUA, LC 775/15)') if v == v and v is not None else 'Conforme Lei ZR')
 new['area_m2'] = new.area.round(1)
 new.insert(0, 'id_novo', new.index)
 new = gpd.GeoDataFrame(new, geometry='geometry', crs=CRS_M)
@@ -204,23 +254,27 @@ save(new, 'pdus_novo_zonas', 'pdus_novo_zonas')
 
 # ---------------------------------------------------------------- Sobreposicao
 OLDC = ['id_ant', 'cod_subun', 'zona_uso', 'dens_cod', 'ativ_cod', 'ia_cod', 'vol_cod', 'ia_bas', 'ia_max',
-        'caeq_bas', 'caeq_max', 'alt_max']
-NEWC = ['id_novo', 'zot', 'ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'bairro']
+        'ia_teto', 'regime_ref', 'caeq_bas', 'caeq_max', 'alt_max']
+NEWC = ['id_novo', 'zot', 'ocupacao', 'ca_bas', 'ca_max', 'alt_max', 'base_calc', 'bairro']
 a = old_g[OLDC + ['geometry']].rename(columns={'alt_max': 'alt_ant'})
 b = new[NEWC + ['geometry']].rename(columns={'alt_max': 'alt_novo'})
 ov = gpd.overlay(a, b, how='intersection', keep_geom_type=True)
 ov = ov[ov.area >= 10].copy()
+rp = ov.base_calc.eq('PDDUA (IA)')   # Zona Rural: o regime da subunidade nao muda (LC 775/15)
+ov.loc[rp, 'ca_bas'] = ov.loc[rp, 'ia_bas']
+ov.loc[rp, 'ca_max'] = ov.loc[rp, 'ia_max']
 ov['d_ca_bas'] = (ov.ca_bas - ov.caeq_bas).round(2)
 ov['d_ca_max'] = (ov.ca_max - ov.caeq_max).round(2)
+ov.loc[rp & ov.ia_bas.notna(), ['d_ca_bas', 'd_ca_max']] = 0.0
 ov['d_alt'] = (ov.alt_novo - ov.alt_ant).round(1)
 ov['r_ca_max'] = (ov.ca_max / ov.caeq_max).round(3)
 # ganho de area privativa com o potencial basico (e maximo): (CA x 0,8) / (IA x 1,2) - 1
 ov['priv_ant'] = (ov.ia_bas * EF_ANT).round(3)
-ov['priv_novo'] = (ov.ca_bas * EF_NOVO).round(3)
+ov['priv_novo'] = (ov.ca_bas * np.where(rp, EF_ANT, EF_NOVO)).round(3)
 pos = (ov.ia_bas > 0) & (ov.ca_bas > 0)
 ov['ganho_bas'] = ((ov.priv_novo / ov.priv_ant - 1) * 100).where(pos).round(1)
 posm = (ov.ia_max > 0) & (ov.ca_max > 0)
-ov['ganho_max'] = (((ov.ca_max * EF_NOVO) / (ov.ia_max * EF_ANT) - 1) * 100).where(posm).round(1)
+ov['ganho_max'] = (((ov.ca_max * np.where(rp, EF_ANT, EF_NOVO)) / (ov.ia_max * EF_ANT) - 1) * 100).where(posm).round(1)
 
 
 def classe(d, tol):
@@ -261,10 +315,10 @@ pd.DataFrame(rows).sort_values('ganho_priv_bas_pct', ascending=False).to_csv(
     os.path.join(OUT, 'tabelas', 'dinamica_por_bairro.csv'), index=False)
 
 # ---------------------------------------------------------------- Matriz IA basico x CA basico
-mx = ov[ov.ia_bas.notna() & ov.ca_bas.notna()].groupby(['ia_bas', 'ca_bas']).agg(
+mx = ov[ov.ia_bas.notna() & ov.ca_bas.notna()].groupby(['base_calc', 'ia_bas', 'ca_bas']).agg(
     area_km2=('area_m2', lambda a: round(a.sum() / 1e6, 3)), pecas=('area_m2', 'size')).reset_index()
 mx['priv_ant'] = (mx.ia_bas * EF_ANT).round(3)
-mx['priv_novo'] = (mx.ca_bas * EF_NOVO).round(3)
+mx['priv_novo'] = (mx.ca_bas * np.where(mx.base_calc.eq('PDDUA (IA)'), EF_ANT, EF_NOVO)).round(3)
 mx['ganho_pct'] = ((mx.priv_novo / mx.priv_ant - 1) * 100).round(1)
 mx.to_csv(os.path.join(OUT, 'tabelas', 'matriz_ia_ca_basico.csv'), index=False)
 print(mx.to_string(index=False))

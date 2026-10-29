@@ -104,15 +104,18 @@ for r in old.itertuples():
                   ('IA básico / máximo', f'{fmt(r.ia_bas)} / {fmt(r.ia_max)}'),
                   ('CA equivalente (×1,5)', f'{fmt(r.caeq_bas)} / {fmt(r.caeq_max)}'),
                   ('Altura máxima', fmt(r.alt_max, ' m') if r.alt_max == r.alt_max and r.alt_max is not None else fmt(r.alt_txt)),
-                  ('Taxa de ocupação', fmt(r.tx_ocup))])
+                  ('Taxa de ocupação', fmt(r.tx_ocup)), ('Regime definido por', fmt(r.regime_ref) if r.regime_ref else '—'),
+                  ('Teto do IA (Anexo 6)', fmt(r.ia_teto))])
     items.append(placemark(f'IA {fmt(r.ia_bas)} · {r.zona_uso}', sid, desc, r.geometry, False))
 folder('Plano antigo · PDDUA · cor pelo IA básico', items, False)
 
 new = simp(gpd.read_file(os.path.join(DADOS, 'pdus_novo_zonas.gpkg')))
 items = []
 for r in new.itertuples():
-    sid = style(f'ca_{r.ca_bas}'.replace('.', '_'), ramp(CORES['priv'], r.ca_bas * EF_NOVO) if ok(r.ca_bas) else CINZA)
+    ef = EF_ANT if r.base_calc == 'PDDUA (IA)' else EF_NOVO   # Zona Rural mantem a base de calculo do PDDUA
+    sid = style(f'ca_{r.base_calc[0]}_{r.ca_bas}'.replace('.', '_'), ramp(CORES['priv'], r.ca_bas * ef) if ok(r.ca_bas) else CINZA)
     desc = table([('ZOT', fmt(r.zot)), ('Ocupação', fmt(r.ocupacao)), ('CA básico / máximo', f'{fmt(r.ca_bas_txt)} / {fmt(r.ca_max_txt)}'),
+                  ('Fonte do CA básico', fmt(r.fonte_ca_bas)),
                   ('Altura máxima', fmt(r.alt_txt, ' m')), ('Lote mínimo', fmt(r.lote_min, ' m²')),
                   ('Bairro · setor', f'{fmt(r.bairro)} · {fmt(r.setor)}'), ('ZOT no projeto pós-audiência', fmt(r.zot_projeto))])
     items.append(placemark(f'CA {fmt(r.ca_bas_txt)} · {r.zot}', sid, desc, r.geometry, False))

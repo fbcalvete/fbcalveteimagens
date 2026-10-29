@@ -268,7 +268,7 @@ details.more p { margin: 6px 0 0; }
       <h2>Matriz IA básico × CA básico</h2>
       <div class="mxwrap"><table class="mx" id="mx"></table></div>
       <div class="mxfilter" id="mxfilter" hidden><span id="mxlabel"></span><button class="mini" id="mxclear">Mostrar todas</button></div>
-      <p class="note">Linhas: IA do plano antigo. Colunas: CA básico do plano novo. Cada célula traz o ganho e a área onde a combinação ocorre. Clique numa célula para ver só aquelas áreas no mapa. Células apagadas não ocorrem na cidade. CA básico 3,0 não existe no plano novo (3,0 é o CA máximo das ZOT 02 e 03).</p>
+      <p class="note">Linhas: IA do plano antigo. Colunas: CA básico do plano novo. Cada célula traz o ganho e a área onde a combinação ocorre. Clique numa célula para ver só aquelas áreas no mapa. Células apagadas não ocorrem na cidade. CA básico 3,0 vem da Emenda 91 (ZOT 08.3-A/B/C, 12 e 13) e 3,6 inclui a ZOT 08.3-D (Bom Fim e Cidade Baixa, Subemenda 1 à Emenda 93). Na Zona Rural o regime do PDDUA continua valendo (LC 775/15).</p>
     </section>
 
     <section aria-label="Resumo da dinâmica">
@@ -288,7 +288,8 @@ details.more p { margin: 6px 0 0; }
       <p><b>Comparação:</b> a base de cálculo muda entre os planos. O IA do PDDUA conta só áreas adensáveis; o CA novo soma adensáveis e não adensáveis. A área privativa potencial é IA × 1,2 no plano antigo e CA × 0,8 no novo (eficiências editáveis acima). Ganho = (CA × 0,8) ÷ (IA × 1,2) − 1. A razão 1,2 ÷ 0,8 = 1,5 é a mesma equivalência que a SMAMUS usa no comparativo oficial. CA máximo “não se aplica” ou “Ajuste/TDC” é tratado como igual ao básico.</p>
       <ul>
         <li>As leis novas entram em vigor 180 dias após a publicação (14/07/2026). Até lá vale o PDDUA.</li>
-        <li>ZOT 08.3 - D (emenda; Cidade Baixa e Bom Fim) ainda não tem parâmetros na base GIS da Prefeitura.</li>
+        <li>A base GIS da Prefeitura ainda não traz as emendas de CA básico. O mapa aplica: Emenda 91 (CA básico 3,0 nas ZOT 08.3-A, 08.3-B, 08.3-C, 12 e 13) e Subemenda 1 à Emenda 93 (CA básico 3,6 na ZOT 08.3-D, Bom Fim e Cidade Baixa). CA máximo e altura da ZOT 08.3-D seguem sem publicação.</li>
+        <li>Onde o IA antigo não é numérico, o regime vem de lei ou decreto próprio, AEIS ou área especial. O mapa mostra a norma (observações do DMWeb 2.0). Nos códigos 23 e 25 o Anexo 6 fixa teto de IA 2,5.</li>
         <li>Numeração das ruas é interpolada nos trechos oficiais: confira o lote no DMWeb antes de decidir.</li>
         <li>Geometria simplificada a 0,3 m para o HTML. Os arquivos completos (GPKG/GeoJSON) estão na pasta <span class="code">dados/</span>.</li>
       </ul>
@@ -367,15 +368,19 @@ function find(layer, ll) {
 }
 
 /* ---------- atributos ---------- */
+const fmt = (v, d = 2) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
 const OLD = D.old.a.map((a) => {
   const ia = D.lk.ia[a[6]] || [], vol = D.lk.vol[a[7]] || [];
   return { cod: a[0], mz: a[1], ueu: a[2], sub: a[3], dens: a[4], ativ: a[5], iaCod: a[6], volCod: a[7], obs: a[8],
     zona: D.lk.zu[a[5]] || 'Regime urbanístico próprio', iaBas: ia[0], iaMax: ia[1], sc: ia[2], tpc: ia[3], quota: ia[4],
-    iaObs: ia[5], alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4] };
+    iaObs: ia[5], teto: ia[6], ref: a[9] >= 0 ? D.old.refs[a[9]] : '', alt: vol[0], altTxt: vol[1], altDiv: vol[2], altBase: vol[3], to: vol[4] };
 });
+/* Zona Rural: a LUOS remete a lei propria (LC 775/15), que mantem o regime do PDDUA da subunidade */
 const NEW = D.new.a.map((a) => {
-  const r = D.reg[a[0]] || {};
-  return { zot: a[0], bairro: a[1], setor: a[2], upl: a[3], comp: a[4] === 1, zotProj: a[5], caBas: r.ca_bas, caMax: r.ca_max,
+  const r = D.reg[a[0]] || {}, rural = a.length > 6;
+  return { zot: a[0], bairro: a[1], setor: a[2], upl: a[3], comp: a[4] === 1, zotProj: a[5], rural,
+    caBas: rural ? a[6] : r.ca_bas, caMax: rural ? a[7] : r.ca_max,
+    caTxt: rural ? (a[6] != null ? `${fmt(a[6])} (IA do PDDUA, LC 775/15)` : 'Conforme lei da Zona Rural') : (r.ca_bas_txt || '—'),
     alt: r.alt_max, r };
 });
 
@@ -384,15 +389,18 @@ const NEW = D.new.a.map((a) => {
    Antigo: IA x 1,2   Novo: CA x 0,8   Ganho = (CA x 0,8) / (IA x 1,2) - 1 */
 const EF = { old: 1.2, new: 0.8 };
 const privOld = (ia) => (ia > 0 ? ia * EF.old : null);
-const privNew = (ca) => (ca > 0 ? ca * EF.new : null);
-function gainOf(ia, ca) { const a = privOld(ia), b = privNew(ca); return a && b ? b / a - 1 : null; }
+const privNew = (ca, rural) => (ca > 0 ? ca * (rural ? EF.old : EF.new) : null);
+/* na Zona Rural o regime e a base de calculo nao mudam: ganho zero */
+function gainOf(ia, ca, rural) { if (rural) return ia > 0 ? 0 : null; const a = privOld(ia), b = privNew(ca); return a && b ? b / a - 1 : null; }
 function dyn(o, n) {
   const dA = o.alt != null && n.alt != null ? Math.round((n.alt - o.alt) * 10) / 10 : null;
-  return { gB: gainOf(o.iaBas, n.caBas), gM: gainOf(o.iaMax, n.caMax), dA };
+  return { gB: gainOf(o.iaBas, n.caBas, n.rural), gM: gainOf(o.iaMax, n.caMax, n.rural), dA };
 }
+const short = (t, k = 70) => (t && t.length > k ? t.slice(0, k - 1) + '…' : t);
+const iaTxt = (o) => (o.iaBas != null ? fmt(o.iaBas) : (o.ref ? short(o.ref, 60) : 'norma específica') + (o.teto ? ` (teto ${fmt(o.teto)})` : ''));
+function matchFilter(o, n, f) { return f.ca === 'ZR' ? n.rural && o.iaBas === f.ia : !n.rural && o.iaBas === f.ia && n.caBas === f.ca; }
 
 /* ---------- cores ---------- */
-const fmt = (v, d = 2) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: d }));
 const pct = (g, d = 0) => (g == null ? '—' : (g > 0.0005 ? '+' : '') + (g * 100).toLocaleString('pt-BR', { maximumFractionDigits: d }).replace('-', '−') + '%');
 const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const rgb2hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
@@ -411,8 +419,8 @@ const gainColor = (g) => ramp(GANHO, g * 100);
 const privColor = (v) => ramp(D.cores.priv, v);
 const inkOn = (hex) => { const [r, g, b] = hex2rgb(hex); return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1b1b1b' : '#ffffff'; };
 const SEM = { color: '#b9bcc6', label: 'Sem comparação (IA ou CA não numérico)' };
-const SEM_OLD = { color: '#b9bcc6', label: 'IA não numérico (regime próprio, EVU, lei específica)' };
-const SEM_NEW = { color: '#b9bcc6', label: 'CA não numérico (Especial, Zona Rural, vetado, ZOT 08.3-D)' };
+const SEM_OLD = { color: '#b9bcc6', label: 'IA definido em lei ou decreto próprio, AEIS ou área especial (a consulta mostra qual)' };
+const SEM_NEW = { color: '#b9bcc6', label: 'CA não numérico (área Especial, polígono vetado)' };
 
 const state = {
   old: { on: false, outline: false, op: 0.7 }, new: { on: false, outline: false, op: 0.7 }, ov: { on: true, op: 0.8 },
@@ -425,13 +433,14 @@ function classify(name, i) {
     return { k: 'i' + o.iaBas, color: privColor(v), order: o.iaBas, label: `IA ${fmt(o.iaBas)}  ·  ${fmt(v)} m² privativos por m² de terreno` };
   }
   if (name === 'new') {
-    const n = NEW[i], v = privNew(n.caBas);
+    const n = NEW[i], v = privNew(n.caBas, n.rural);
     if (v == null) return { k: 'sem', ...SEM_NEW };
+    if (n.rural) return { k: 'r' + n.caBas, color: privColor(v), order: n.caBas - 0.001, label: `Zona Rural: IA ${fmt(n.caBas)} do PDDUA (LC 775/15)  ·  ${fmt(v)} m² privativos por m² de terreno` };
     return { k: 'c' + n.caBas, color: privColor(v), order: n.caBas, label: `CA ${fmt(n.caBas)}  ·  ${fmt(v)} m² privativos por m² de terreno` };
   }
   const [a, b] = D.ov.a[i], o = OLD[a], n = NEW[b], f = state.filter;
-  if (f && !(o.iaBas === f.ia && n.caBas === f.ca)) return null;
-  const g = gainOf(o.iaBas, n.caBas);
+  if (f && !matchFilter(o, n, f)) return null;
+  const g = gainOf(o.iaBas, n.caBas, n.rural);
   if (g == null) return { k: 'sem', ...SEM };
   return { k: 'g' + Math.round(g * 1000), color: gainColor(g), order: g, label: pct(g) };
 }
@@ -630,11 +639,16 @@ function resultHTML(q) {
   h += `<div class="addr">${addr}${addr ? '<br>' : ''}<span class="code">${coord}</span></div>`;
   if (io < 0 && inw < 0) return h + '<div class="empty">Ponto fora das zonas dos dois planos (rio, via ou fora do município).</div>';
   if (io >= 0 && inw >= 0) {
-    const o = OLD[io], n = NEW[inw], d = dyn(o, n), po = privOld(o.iaBas), pn = privNew(n.caBas);
+    const o = OLD[io], n = NEW[inw], d = dyn(o, n), po = privOld(o.iaBas), pn = privNew(n.caBas, n.rural);
+    const gT = o.iaBas == null && o.teto && n.caBas ? gainOf(o.teto, n.caBas, n.rural) : null;
+    let why = '';
+    if (n.rural) why = `<p class="note">Zona Rural: a LUOS remete à lei da Zona Rural (LC 775/15), que mantém o regime do PDDUA da subunidade. Mesmo índice e mesma base de cálculo, ganho zero.</p>`;
+    else if (d.gB != null) why = `<p class="calc">(CA ${fmt(n.caBas)} × ${fmt(EF.new)}) ÷ (IA ${fmt(o.iaBas)} × ${fmt(EF.old)}) − 1 = ${fmt(pn)} ÷ ${fmt(po)} − 1</p>`;
+    else if (o.iaBas == null) why = `<p class="note">O IA antigo deste ponto é definido por: <b>${esc(o.ref || o.iaObs || 'norma específica')}</b>.${gT != null ? ` No pior caso, com o IA no teto do Anexo 6 (${fmt(o.teto)}), o ganho seria de <b>${pct(gT)}</b>; com IA menor, o ganho é maior.` : ''}</p>`;
+    else why = `<p class="note">O CA do plano novo não é numérico neste ponto (${esc(n.caTxt || n.zot)}).</p>`;
     h += `<div class="card dyn"><h3>Ganho de área privativa neste ponto</h3>
-      <div class="gain">${gainChip(d.gB)}<span>com o potencial <b>básico</b>:<br>IA ${fmt(o.iaBas)} (antigo) → CA ${esc(n.r.ca_bas_txt || '—')} (novo)</span></div>
-      ${d.gB != null ? `<p class="calc">(CA ${fmt(n.caBas)} × ${fmt(EF.new)}) ÷ (IA ${fmt(o.iaBas)} × ${fmt(EF.old)}) − 1 = ${fmt(pn)} ÷ ${fmt(po)} − 1</p>`
-        : `<p class="note">${o.iaBas == null ? 'O IA do plano antigo não é numérico neste ponto (regime próprio / EVU / lei específica).' : 'O CA do plano novo não é numérico neste ponto (' + esc(n.r.ca_bas_txt || n.zot) + ').'}</p>`}
+      <div class="gain">${gainChip(d.gB)}<span>com o potencial <b>básico</b>:<br>IA ${esc(iaTxt(o))} (antigo) → CA ${esc(n.caTxt)} (novo)</span></div>
+      ${why}
       <dl class="kv" style="margin-top:8px">
         <dt>Com o potencial máximo (IA ${fmt(o.iaMax)} → CA ${fmt(n.caMax)})</dt><dd>${pct(d.gM)}</dd>
         <dt>Altura máxima</dt><dd>${fmt(o.alt, 1)} → ${fmt(n.alt, 1)} m${d.dA != null ? ` (${sign(d.dA, 1)})` : ''}</dd>
@@ -647,7 +661,8 @@ function resultHTML(q) {
     h += `<div class="card old"><h3>Plano antigo · PDDUA</h3><div class="zone">${esc(o.zona)}</div>
       <div class="code">MZ ${o.mz} · UEU ${o.ueu} · Subunidade ${o.sub} &nbsp;|&nbsp; D·A·I·V ${esc(daiv)}</div>
       <dl class="kv" style="margin-top:8px">
-        <dt>IA básico (Anexo 6)</dt><dd>${fmt(o.iaBas)}</dd>
+        <dt>IA básico (Anexo 6)</dt><dd>${o.iaBas != null ? fmt(o.iaBas) : '<span class="txt">norma específica</span>'}</dd>
+        ${o.teto ? `<dt>Teto do IA (Anexo 6)</dt><dd>${fmt(o.teto)}</dd>` : ''}
         <dt>IA máximo (solo criado + TPC)</dt><dd>${fmt(o.iaMax)}</dd>
         <dt>Área privativa potencial (IA × ${fmt(EF.old)}), básica / máxima</dt><dd>${fmt(privOld(o.iaBas))} / ${fmt(privOld(o.iaMax))}</dd>
         <dt>Solo criado · TPC · quota ideal</dt><dd class="txt">${esc(o.sc || '—')} · ${esc(o.tpc || '—')} · ${esc(o.quota || '—')}${o.quota && o.quota !== '-' ? ' m²' : ''}</dd>
@@ -655,6 +670,7 @@ function resultHTML(q) {
         <dt>Altura na divisa · base</dt><dd class="txt">${esc(o.altDiv || '—')} · ${esc(o.altBase || '—')}</dd>
         <dt>Taxa de ocupação</dt><dd class="txt">${esc(o.to || '—')}</dd>
       </dl>
+      ${o.ref ? `<p class="note">Regime definido por: <b>${esc(o.ref)}</b> (observação do DMWeb).</p>` : ''}
       ${o.iaObs ? `<p class="note">${esc(o.iaObs)}</p>` : ''}
       ${o.obs ? `<p class="note">Observações da subunidade (códigos): ${esc(o.obs)}</p>` : ''}
       ${q.viaO != null ? `<p class="note">O ponto cai na via; mostrando a subunidade mais próxima (a ${Math.round(q.viaO)} m). Confira o lado da rua.</p>` : ''}</div>`;
@@ -664,14 +680,15 @@ function resultHTML(q) {
     h += `<div class="card new"><h3>Plano novo · LUOS 2026</h3><div class="zone">${esc(n.zot)}${r.ocupacao ? ` <span class="code">· ocupação ${esc(r.ocupacao)}</span>` : ''}</div>
       <div class="code">${esc([n.bairro, n.setor, n.upl].filter(Boolean).join(' · '))}</div>
       <dl class="kv" style="margin-top:8px">
-        <dt>CA básico</dt><dd>${esc(r.ca_bas_txt || '—')}</dd>
+        <dt>CA básico</dt><dd>${esc(n.caTxt)}</dd>
         <dt>CA máximo</dt><dd>${esc(r.ca_max_txt || '—')}</dd>
-        <dt>Área privativa potencial (CA × ${fmt(EF.new)}), básica / máxima</dt><dd>${fmt(privNew(n.caBas))} / ${fmt(privNew(n.caMax))}</dd>
+        <dt>Área privativa potencial (${n.rural ? 'IA × ' + fmt(EF.old) : 'CA × ' + fmt(EF.new)}), básica / máxima</dt><dd>${fmt(privNew(n.caBas, n.rural))} / ${fmt(privNew(n.caMax, n.rural))}</dd>
         <dt>Altura máxima</dt><dd>${r.alt_txt ? esc(r.alt_txt) + (r.alt_max != null ? ' m' : '') : '—'}</dd>
         <dt>Lote mínimo · módulo de fracionamento</dt><dd class="txt">${esc(r.lote_min || '—')} m² · ${esc(r.mod_frac || '—')} m²</dd>
         <dt>Taxa de permeabilidade</dt><dd>${r.perm_min ? esc(r.perm_min) + ' a ' + esc(r.perm_max) + '%' : '—'}</dd>
         <dt>Recuo de jardim</dt><dd>${esc(r.recuo_jard || '—')}${r.recuo_jard && !isNaN(parseFloat(String(r.recuo_jard).replace(',', '.'))) ? ' m' : ''}</dd>
       </dl>
+      ${r.fonte_ca_bas && /menda/.test(r.fonte_ca_bas) ? `<p class="note">CA básico conforme <b>${esc(r.fonte_ca_bas)}</b>, aprovada pela Câmara em 13/05/2026. A base GIS da Prefeitura ainda mostra ${r.ca_bas_gis != null ? fmt(r.ca_bas_gis) : 'sem valor'}.</p>` : ''}
       ${n.zotProj && n.zotProj !== n.zot ? `<p class="note">No projeto pós-audiência (set/2025) este ponto era <b>${esc(n.zotProj)}</b>; mudou por emenda ou veto.</p>` : ''}
       ${n.comp ? '<p class="note">Fora do mapa da LUOS sancionada; zona tirada do Anexo 5 do PDUS.</p>' : ''}
       ${q.viaN != null ? `<p class="note">O ponto cai na via; mostrando o quarteirão mais próximo (a ${Math.round(q.viaN)} m). Confira o lado da rua.</p>` : ''}
@@ -682,9 +699,9 @@ function resultHTML(q) {
 function summaryText(q) {
   const o = q.io >= 0 ? OLD[q.io] : null, n = q.inw >= 0 ? NEW[q.inw] : null;
   const L1 = [`Ponto: ${q.ll.lat.toFixed(6)}, ${q.ll.lng.toFixed(6)}${q.label ? ' (' + q.label + ')' : ''}`];
-  if (o && n) { const d = dyn(o, n); L1.push(`Ganho de área privativa (básico): ${pct(d.gB, 1)} | IA ${fmt(o.iaBas)} × ${fmt(EF.old)} → CA ${fmt(n.caBas)} × ${fmt(EF.new)} | com potencial máximo: ${pct(d.gM, 1)}`); }
-  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${fmt(o.iaBas)} (máx ${fmt(o.iaMax)}) | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}`);
-  if (n) L1.push(`LUOS 2026: ${n.zot} | CA ${n.r.ca_bas_txt || '—'} (máx ${n.r.ca_max_txt || '—'}) | altura ${n.r.alt_txt || '—'} m | lote mín. ${n.r.lote_min || '—'} m²`);
+  if (o && n) { const d = dyn(o, n); L1.push(`Ganho de área privativa (básico): ${pct(d.gB, 1)} | IA ${iaTxt(o)} × ${fmt(EF.old)} → CA ${n.caTxt}${n.rural ? '' : ' × ' + fmt(EF.new)} | com potencial máximo: ${pct(d.gM, 1)}`); }
+  if (o) L1.push(`PDDUA: ${o.zona} | MZ ${o.mz} UEU ${o.ueu} sub ${o.sub} | D-A-I-V ${o.dens}-${o.ativ}-${o.iaCod}-${o.volCod} | IA ${iaTxt(o)} (máx ${fmt(o.iaMax)}) | altura ${o.alt != null ? fmt(o.alt, 1) + ' m' : o.altTxt}${o.ref ? ' | regime: ' + o.ref : ''}`);
+  if (n) L1.push(`LUOS 2026: ${n.zot} | CA ${n.caTxt} (máx ${n.r.ca_max_txt || '—'}) | altura ${n.r.alt_txt || '—'} m | lote mín. ${n.r.lote_min || '—'} m²${n.r.fonte_ca_bas && /menda/.test(n.r.fonte_ca_bas) ? ' | CA básico: ' + n.r.fonte_ca_bas : ''}`);
   return L1.join('\n');
 }
 function copySummary(ev) {
@@ -705,11 +722,11 @@ function hover() {
   if (!o && !n) { tip.hidden = true; return; }
   const rows = [];
   if (o && n) {
-    const g = gainOf(o.iaBas, n.caBas), c = g == null ? SEM.color : gainColor(g);
+    const g = gainOf(o.iaBas, n.caBas, n.rural), c = g == null ? SEM.color : gainColor(g);
     rows.push(`<div class="g"><i style="background:${c}"></i><b>${g == null ? 'Sem comparação' : pct(g)}</b>${g == null ? '' : ' de área privativa'}</div>`);
   }
-  rows.push(`<div><span class="o">IA anterior</span> ${o ? (o.iaBas != null ? fmt(o.iaBas) : 'regime próprio') : '—'}`
-    + `  <span class="n">CA futuro</span> ${n ? esc(n.r.ca_bas_txt || '—') : '—'}</div>`);
+  rows.push(`<div><span class="o">IA anterior</span> ${o ? esc(iaTxt(o)) : '—'}</div>`);
+  rows.push(`<div><span class="n" style="margin-left:0">CA futuro</span> ${n ? esc(n.caTxt) : '—'}</div>`);
   rows.push(`<div class="z">${o ? esc(o.zona) : '—'} → ${n ? esc(n.zot) : '—'}</div>`);
   tip.innerHTML = rows.join('');
   tip.hidden = false;
@@ -871,21 +888,22 @@ function legendHTML() {
   $('#legend').innerHTML = parts.join('') || '<div class="empty">Ligue uma camada para ver a legenda.</div>';
 }
 const IA_VALS = [...new Set(OLD.map((o) => o.iaBas).filter((v) => v > 0))].sort((a, b) => a - b);
-const CA_VALS = [...new Set(NEW.map((n) => n.caBas).filter((v) => v > 0))].sort((a, b) => a - b);
+const CA_VALS = [...new Set(NEW.filter((n) => !n.rural).map((n) => n.caBas).filter((v) => v > 0))].sort((a, b) => a - b);
 const AREA = new Map();
 D.ov.a.forEach(([a, b, ar]) => {
-  const ia = OLD[a].iaBas, ca = NEW[b].caBas, k = ia > 0 && ca > 0 ? ia + '|' + ca : 'sem';
+  const ia = OLD[a].iaBas, n = NEW[b], k = !(ia > 0) ? 'sem' : n.rural ? ia + '|ZR' : n.caBas > 0 ? ia + '|' + n.caBas : 'sem';
   AREA.set(k, (AREA.get(k) || 0) + ar);
 });
 const fmtArea = (m) => (m >= 1e6 ? fmt(m / 1e6, 1) + ' km²' : m >= 1e4 ? fmt(m / 1e4, 0) + ' ha' : '< 1 ha');
 function matrixHTML() {
-  let h = `<thead><tr><th class="corner">IA \\ CA</th>${CA_VALS.map((c) => `<th>${fmt(c)}</th>`).join('')}</tr></thead><tbody>`;
+  let h = `<thead><tr><th class="corner">IA \\ CA</th>${CA_VALS.map((c) => `<th>${fmt(c)}</th>`).join('')}<th title="Zona Rural: LC 775/15 mantém o regime do PDDUA">Zona rural</th></tr></thead><tbody>`;
   for (const ia of IA_VALS) {
     h += `<tr><th>${fmt(ia)}</th>`;
-    for (const ca of CA_VALS) {
-      const g = gainOf(ia, ca), col = gainColor(g), ar = AREA.get(ia + '|' + ca) || 0;
+    for (const ca of CA_VALS.concat(['ZR'])) {
+      const zr = ca === 'ZR', g = gainOf(ia, zr ? ia : ca, zr), col = gainColor(g), ar = AREA.get(ia + '|' + ca) || 0;
+      if (zr && !ar) { h += '<td class="none zr"></td>'; continue; }
       const on = !!state.filter && state.filter.ia === ia && state.filter.ca === ca;
-      const tt = `IA ${fmt(ia)} → CA ${fmt(ca)}: ${pct(g, 1)}${ar ? ' · ' + fmtArea(ar) + ' no mapa' : ' · não ocorre no mapa'}`;
+      const tt = `IA ${fmt(ia)} → ${zr ? 'Zona Rural (mesmo regime do PDDUA)' : 'CA ' + fmt(ca)}: ${pct(g, 1)}${ar ? ' · ' + fmtArea(ar) + ' no mapa' : ' · não ocorre no mapa'}`;
       h += ar ? `<td class="has${on ? ' on' : ''}" data-ia="${ia}" data-ca="${ca}" tabindex="0" role="button" aria-pressed="${on}" title="${tt}" style="background:${col};color:${inkOn(col)}"><b>${pct(g)}</b><small>${fmtArea(ar)}</small></td>`
         : `<td class="none" title="${tt}" style="background:${col};color:${inkOn(col)}"><b>${pct(g)}</b></td>`;
     }
@@ -894,7 +912,7 @@ function matrixHTML() {
   $('#mx').innerHTML = h + '</tbody>';
   const f = state.filter;
   $('#mxfilter').hidden = !f;
-  if (f) $('#mxlabel').textContent = `Mostrando só IA ${fmt(f.ia)} → CA ${fmt(f.ca)} (${pct(gainOf(f.ia, f.ca), 1)}) · ${fmtArea(AREA.get(f.ia + '|' + f.ca) || 0)}`;
+  if (f) $('#mxlabel').textContent = `Mostrando só IA ${fmt(f.ia)} → ${f.ca === 'ZR' ? 'Zona Rural' : 'CA ' + fmt(f.ca)} (${pct(gainOf(f.ia, f.ca === 'ZR' ? f.ia : f.ca, f.ca === 'ZR'), 1)}) · ${fmtArea(AREA.get(f.ia + '|' + f.ca) || 0)}`;
 }
 function setFilter(f) {
   state.filter = f;
@@ -902,13 +920,13 @@ function setFilter(f) {
   rerender(['ov']); matrixHTML();
   if (f) {
     const b = L.latLngBounds([]);
-    D.ov.a.forEach(([a, c], i) => { if (OLD[a].iaBas === f.ia && NEW[c].caBas === f.ca) { const bb = L_OV.bbox[i]; b.extend([bb[0], bb[1]]); b.extend([bb[2], bb[3]]); } });
+    D.ov.a.forEach(([a, c], i) => { if (matchFilter(OLD[a], NEW[c], f)) { const bb = L_OV.bbox[i]; b.extend([bb[0], bb[1]]); b.extend([bb[2], bb[3]]); } });
     if (b.isValid()) map.fitBounds(b, { padding: [20, 20], maxZoom: 16 });
   }
 }
 $('#mx').addEventListener('click', (e) => {
   const td = e.target.closest('td.has'); if (!td) return;
-  const f = { ia: +td.dataset.ia, ca: +td.dataset.ca };
+  const f = { ia: +td.dataset.ia, ca: td.dataset.ca === 'ZR' ? 'ZR' : +td.dataset.ca };
   setFilter(state.filter && state.filter.ia === f.ia && state.filter.ca === f.ca ? null : f);
 });
 $('#mx').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('td.has')) { e.preventDefault(); e.target.click(); } });
@@ -919,7 +937,7 @@ const BUCKETS = [['até −25%', -Infinity, -0.25, -0.44], ['−25% a −5%', -0
 function summaryHTML() {
   const area = BUCKETS.map(() => 0); let sem = 0;
   D.ov.a.forEach(([a, b, ar]) => {
-    const g = gainOf(OLD[a].iaBas, NEW[b].caBas);
+    const g = gainOf(OLD[a].iaBas, NEW[b].caBas, NEW[b].rural);
     if (g == null) { sem += ar; return; }
     const k = BUCKETS.findIndex(([, lo, hi]) => (lo === -Infinity ? g <= hi : hi === Infinity ? g > lo : lo === -0.05 ? g >= lo && g <= hi : g > lo && g <= hi));
     area[k < 0 ? 2 : k] += ar;
@@ -964,8 +982,8 @@ if (STANDALONE) {
   $('#export').hidden = false;
   const props = {
     old: (i) => { const o = OLD[i]; return { cod_subun: o.cod, mz: o.mz, ueu: o.ueu, subunidade: o.sub, densidade: o.dens, atividade: o.ativ, indice: o.iaCod, volumetria: o.volCod, zona_uso: o.zona, ia_basico: o.iaBas, ia_maximo: o.iaMax, priv_basica: privOld(o.iaBas), altura_max: o.alt, altura_txt: o.altTxt }; },
-    new: (i) => { const n = NEW[i]; return { zot: n.zot, bairro: n.bairro, setor: n.setor, upl: n.upl, zot_projeto: n.zotProj, ca_basico: n.caBas, ca_maximo: n.caMax, priv_basica: privNew(n.caBas), altura_max: n.alt, ca_basico_txt: n.r.ca_bas_txt, ca_maximo_txt: n.r.ca_max_txt, altura_txt: n.r.alt_txt }; },
-    ov: (i) => { const [a, b, ar] = D.ov.a[i], o = OLD[a], n = NEW[b], d = dyn(o, n); return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ia_basico_ant: o.iaBas, ca_basico_novo: n.caBas, ef_ant: EF.old, ef_novo: EF.new, priv_ant: privOld(o.iaBas), priv_novo: privNew(n.caBas), ganho_bas_pct: d.gB == null ? null : Math.round(d.gB * 1000) / 10, ganho_max_pct: d.gM == null ? null : Math.round(d.gM * 1000) / 10, alt_ant: o.alt, alt_novo: n.alt, area_m2: ar }; },
+    new: (i) => { const n = NEW[i]; return { zot: n.zot, bairro: n.bairro, setor: n.setor, upl: n.upl, zot_projeto: n.zotProj, ca_basico: n.caBas, ca_maximo: n.caMax, priv_basica: privNew(n.caBas, n.rural), fonte_ca_basico: n.rural ? 'LC 775/15 (regime do PDDUA)' : n.r.fonte_ca_bas, altura_max: n.alt, ca_basico_txt: n.r.ca_bas_txt, ca_maximo_txt: n.r.ca_max_txt, altura_txt: n.r.alt_txt }; },
+    ov: (i) => { const [a, b, ar] = D.ov.a[i], o = OLD[a], n = NEW[b], d = dyn(o, n); return { cod_subun: o.cod, zona_uso: o.zona, zot: n.zot, ia_basico_ant: o.iaBas, ca_basico_novo: n.caBas, ef_ant: EF.old, ef_novo: EF.new, priv_ant: privOld(o.iaBas), priv_novo: privNew(n.caBas, n.rural), regime_ref_ant: o.ref, ia_teto_ant: o.teto, ganho_bas_pct: d.gB == null ? null : Math.round(d.gB * 1000) / 10, ganho_max_pct: d.gM == null ? null : Math.round(d.gM * 1000) / 10, alt_ant: o.alt, alt_novo: n.alt, area_m2: ar }; },
   };
   document.querySelectorAll('[data-exp]').forEach((b) => b.addEventListener('click', () => {
     const k = b.dataset.exp, lay = LAYERS[k];

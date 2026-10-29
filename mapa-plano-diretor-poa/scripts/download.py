@@ -4,7 +4,7 @@ Uso: python3 download.py <pasta_saida> [nome_camada ...]
 Paginado (resultOffset) e com retry: o servidor da SMAMUS costuma recusar
 conexoes quando esta sobrecarregado.
 """
-import sys, json, os, time
+import sys, json, os, time, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agsfetch import get
 
@@ -28,7 +28,26 @@ JOBS = [
     ("tab_pddua_vol_anexo7_1", f"{SMA}/pddua_vol_anexo_7_1/FeatureServer/0", "objectid", 2000, False),
     ("tab_pddua_atv_anexo5_1", f"{SMA}/PDDUA_ATVS_ANEXO_5_1/FeatureServer/0", "objectid", 2000, False),
 ]
+# Tabelas de observacoes do DMWeb 2.0 (planilhas publicas no portal da SMAMUS):
+# explicam o regime das subunidades cujo IA nao e numerico (lei/decreto especifico, AEIS etc.)
+PORTAL = "https://gis-smamus.portoalegre.rs.gov.br/portal/sharing/rest/content/items"
+OBS_XLS = {'dm_obs_tipo1': 'f03e47e1a8d94d90b602098998cd837b', 'dm_obs_tipo2': 'c98c0e2908f64872a6293aedc5cfd509',
+           'dm_obs_tipo10': '22c0c925be904a129af523930bce6cbd', 'dm_obs_tipo_geral': 'df64f184fe6649888ee09b379d25f905'}
 only = set(sys.argv[2:])
+for name, item in OBS_XLS.items():
+    path = os.path.join(OUT, name + '.xls')
+    if (only and name not in only) or os.path.exists(path):
+        continue
+    for i in range(6):
+        try:
+            with urllib.request.urlopen(f"{PORTAL}/{item}/data", timeout=120) as r:
+                open(path, 'wb').write(r.read())
+            print('ok', name)
+            break
+        except Exception as e:
+            print('  retry', name, e, file=sys.stderr)
+            time.sleep(3 * (i + 1))
+
 for name, url, oid, ps, geom in JOBS:
     if only and name not in only:
         continue

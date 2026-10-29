@@ -73,14 +73,17 @@ assert (old.id_ant.values == np.arange(len(old))).all() and (new.id_novo.values 
 
 payload = {}
 og = simp(old, 0.3)
+refs = sorted({r for r in old.regime_ref.fillna('') if r})
+ref_i = {r: i for i, r in enumerate(refs)}
 payload['old'] = {
     'g': [enc_poly(g) for g in og],
-    'a': [[r.cod_subun, val(r.mz), val(r.ueu), val(r.subunid), r.dens_cod, r.ativ_cod, r.ia_cod, r.vol_cod, r.obs or '']
-          for r in old.itertuples()],
+    'a': [[r.cod_subun, val(r.mz), val(r.ueu), val(r.subunid), r.dens_cod, r.ativ_cod, r.ia_cod, r.vol_cod, r.obs or '',
+           ref_i.get(r.regime_ref or '', -1)] for r in old.itertuples()],
+    'refs': refs,   # lei/decreto/area especial que define o regime (observacoes do DMWeb 2.0)
 }
 lk_ia, lk_vol, lk_zu = {}, {}, {}
 for r in old.drop_duplicates('ia_cod').itertuples():
-    lk_ia[r.ia_cod] = [val(r.ia_bas), val(r.ia_max), r.solo_cria, r.tpc, r.quota, r.ia_obs]
+    lk_ia[r.ia_cod] = [val(r.ia_bas), val(r.ia_max), r.solo_cria, r.tpc, r.quota, r.ia_obs, val(r.ia_teto)]
 for r in old.drop_duplicates('vol_cod').itertuples():
     lk_vol[r.vol_cod] = [val(r.alt_max), r.alt_txt, r.alt_divisa, r.alt_base, r.tx_ocup]
 for r in old.drop_duplicates('ativ_cod').itertuples():
@@ -91,7 +94,9 @@ ng = simp(new, 0.3)
 FONTE = {'LUOS sancionada (zoneamento_min)': 0, 'Anexo 5 PDUS (complemento)': 1}
 payload['new'] = {
     'g': [enc_poly(g) for g in ng],
-    'a': [[r.zot, r.bairro, r.setor, r.upl, FONTE[r.fonte], r.zot_projeto] for r in new.itertuples()],
+    # [6], [7]: CA basico/maximo proprios do poligono (Zona Rural = IA do PDDUA da subunidade, LC 775/15)
+    'a': [[r.zot, r.bairro, r.setor, r.upl, FONTE[r.fonte], r.zot_projeto] +
+          ([val(r.ca_bas), val(r.ca_max)] if r.base_calc == 'PDDUA (IA)' else []) for r in new.itertuples()],
 }
 reg = gpd.pd.read_csv(os.path.join(DADOS, 'tabelas', 'pdus_regime_por_zot.csv')).set_index('zot')
 payload['reg'] = {z: {k: val(v) for k, v in row.items()} for z, row in reg.iterrows()}
